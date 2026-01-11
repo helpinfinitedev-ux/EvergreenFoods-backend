@@ -4,11 +4,12 @@
   "description": "",
   "main": "dist/server.js",
   "scripts": {
-    "build": "npx prisma generate && npx tsc",
-    "start": "nodemon dist/server.js",
+    "postinstall": "prisma generate",
+    "build": "prisma generate && tsc",
+    "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
-    "prisma:generate": "npx prisma generate",
-    "prisma:push": "npx prisma db push"
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push"
   },
   "keywords": [],
   "author": "",
