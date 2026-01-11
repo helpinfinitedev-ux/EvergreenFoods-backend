@@ -44,8 +44,11 @@ export const login = async (req: Request, res: Response) => {
     if (!isValid) {
       return res.status(400).json({ error: "Invalid password" });
     }
-
+    if (user.status !== "ACTIVE") {
+      return res.status(401).json({ error: "Inactive User" });
+    }
     const token = generateToken(user.id, user.role, user.status || "ACTIVE");
+
     res.json({ token, user: { id: user.id, name: user.name, mobile: user.mobile, role: user.role, status: user.status } });
   } catch (error) {
     res.status(500).json({ error: "Login failed" });
