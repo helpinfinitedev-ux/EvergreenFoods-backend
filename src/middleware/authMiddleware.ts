@@ -5,6 +5,7 @@ export interface AuthRequest extends Request {
   user?: {
     userId: string;
     role: string;
+    status: string;
   };
 }
 
@@ -16,11 +17,12 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
 
   const token = authHeader.split(" ")[1];
   const decoded = verifyToken(token);
-  console.log(decoded);
   if (!decoded) {
     return res.status(401).json({ error: "Invalid Token" });
   }
-
+  if (decoded.status !== "ACTIVE") {
+    return res.status(401).json({ error: "Inactive User" });
+  }
   (req as AuthRequest).user = decoded;
   next();
 };

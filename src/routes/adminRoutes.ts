@@ -22,14 +22,47 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
     const sellTransactions = transactions.filter((t) => t.type === "SELL");
     const todayPaymentReceived = sellTransactions.reduce((sum, t) => sum + Number(t.paymentCash || 0) + Number(t.paymentUpi || 0), 0);
 
+    // Calculate BUY stats
+    const buyTransactions = transactions.filter((t) => t.type === "BUY");
+    const todayBuyQuantity = buyTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const todayBuyTotalAmount = buyTransactions.reduce((sum, t) => sum + Number(t.totalAmount || 0), 0);
+    const todayBuyAvgRate = todayBuyQuantity > 0 ? todayBuyTotalAmount / todayBuyQuantity : 0;
+
+    // Calculate SELL stats
+    const todaySellQuantity = sellTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const todaySellTotalAmount = sellTransactions.reduce((sum, t) => sum + Number(t.totalAmount || 0), 0);
+    const todaySellAvgRate = todaySellQuantity > 0 ? todaySellTotalAmount / todaySellQuantity : 0;
+
+    // Calculate total available stock from all drivers
+    // Stock = Buy + Shop Buy + Palti(ADD) - Sell - Palti(SUBTRACT) - Weight Loss
+    const totalStockIn = transactions.filter((t) => t.type === "BUY" || t.type === "SHOP_BUY" || (t.type === "PALTI" && t.paltiAction === "ADD")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+    const totalStockOut = transactions.filter((t) => t.type === "SELL" || (t.type === "PALTI" && t.paltiAction === "SUBTRACT")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+    const totalWeightLoss = transactions.filter((t) => t.type === "WEIGHT_LOSS").reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+    const totalAvailableStock = totalStockIn - totalStockOut - totalWeightLoss;
+
+    const totalWeightLossPercentage = totalWeightLoss > 0 ? (totalWeightLoss / todayBuyQuantity) * 100 : 0;
+
+    // Calculate today's profit/loss (Sell - Buy)
+    const todayProfit = todaySellTotalAmount - todayBuyTotalAmount;
+
     const stats = {
-      todayBuy: transactions.filter((t) => t.type === "BUY").reduce((sum, t) => sum + Number(t.amount || 0), 0),
-      todaySell: sellTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0),
+      todayBuy: todayBuyQuantity,
+      todayBuyTotalAmount,
+      todayBuyAvgRate,
+      todaySell: todaySellQuantity,
+      todaySellTotalAmount,
+      todaySellAvgRate,
       todayShopBuy: transactions.filter((t) => t.type === "SHOP_BUY").reduce((sum, t) => sum + Number(t.amount || 0), 0),
       todayFuel: transactions.filter((t) => t.type === "FUEL").length,
-      todayWeightLoss: transactions.filter((t) => t.type === "WEIGHT_LOSS").reduce((sum, t) => sum + Number(t.amount || 0), 0),
+      todayWeightLoss: totalWeightLoss,
       todayPaymentReceived,
       activeDrivers,
+      totalAvailableStock,
+      totalWeightLossPercentage,
+      todayProfit,
     };
 
     res.json(stats);
@@ -208,6 +241,33 @@ export const createVehicle = async (req: Request, res: Response) => {
   }
 };
 
+// Update Transaction (for editing rate/totalAmount)
+export const updateTransaction = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { rate, totalAmount } = req.body;
+
+    const transaction = await prisma.transaction.findUnique({ where: { id } });
+    if (!transaction) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    const updated = await prisma.transaction.update({
+      where: { id },
+      data: {
+        rate: rate !== undefined ? Number(rate) : transaction.rate,
+        totalAmount: totalAmount !== undefined ? Number(totalAmount) : transaction.totalAmount,
+      },
+      include: { driver: true, customer: true, vehicle: true },
+    });
+
+    res.json({ success: true, transaction: updated });
+  } catch (error) {
+    console.error("Update transaction error:", error);
+    res.status(500).json({ error: "Failed to update transaction" });
+  }
+};
+
 export const deleteVehicle = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -248,6 +308,7 @@ router.post("/drivers", createDriver);
 router.put("/drivers/:id/status", updateDriverStatus);
 router.post("/financial/note", createFinancialNote);
 router.get("/transactions", getAdminTransactions);
+router.put("/transactions/:id", updateTransaction);
 
 // Vehicle routes
 router.get("/vehicles", getVehicles);

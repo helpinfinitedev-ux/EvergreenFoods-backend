@@ -24,7 +24,7 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    const token = generateToken(user.id, user.role);
+    const token = generateToken(user.id, user.role, user.status || "ACTIVE");
     res.json({ token, user: { id: user.id, name: user.name, mobile: user.mobile, role: user.role } });
   } catch (error) {
     res.status(500).json({ error: "Registration failed" });
@@ -45,8 +45,8 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid password" });
     }
 
-    const token = generateToken(user.id, user.role);
-    res.json({ token, user: { id: user.id, name: user.name, mobile: user.mobile, role: user.role } });
+    const token = generateToken(user.id, user.role, user.status || "ACTIVE");
+    res.json({ token, user: { id: user.id, name: user.name, mobile: user.mobile, role: user.role, status: user.status } });
   } catch (error) {
     res.status(500).json({ error: "Login failed" });
   }
@@ -54,7 +54,6 @@ export const login = async (req: Request, res: Response) => {
 
 export const getMe = async (req: AuthRequest, res: Response) => {
   try {
-    console.log(req.user);
     if (!req.user?.userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
