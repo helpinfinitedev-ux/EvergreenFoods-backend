@@ -36,6 +36,11 @@ enum ExpenseType {
   BANK
 }
 
+enum CashToBankOperation {
+  DEPOSIT
+  WITHDRAW
+}
+
 model User {
   id           String   @id @default(uuid())
   mobile       String   @unique
@@ -94,6 +99,7 @@ model Transaction {
   unit       String // KG, LITRE, COUNT
   rate       Decimal? // Price per unit
   totalAmount Decimal? // Total value
+  companyName String? // Company name for buy/sell
 
   paymentCash Decimal? @default(0)
   paymentUpi  Decimal? @default(0)
@@ -146,4 +152,17 @@ model Expense {
   updatedAt   DateTime    @updatedAt
 
   @@map("expenses")
+}
+
+
+model CashToBank {
+  id String @id @default(uuid())
+  amount Decimal @default(0)
+  bankName String
+  operation CashToBankOperation @default(DEPOSIT)
+  date DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("cash_to_bank")
 }

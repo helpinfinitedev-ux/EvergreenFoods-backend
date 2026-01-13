@@ -39,11 +39,12 @@ export const addBuyEntry = async (req: Request, res: Response) => {
     const userId = (req as AuthRequest).user?.userId;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const { amount, rate, totalAmount, details, imageUrl } = req.body;
+    const { amount, rate, totalAmount, details, imageUrl, companyName } = req.body;
 
     const tx = await prisma.transaction.create({
       data: {
         driverId: userId,
+        companyName,
         type: "BUY",
         amount: amount,
         unit: "KG",
