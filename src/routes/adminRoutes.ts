@@ -48,6 +48,16 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
     // Calculate today's profit/loss (Sell - Buy)
     const todayProfit = todaySellTotalAmount - todayBuyTotalAmount;
 
+    const banks = await prisma.bank.findMany({
+      orderBy: { name: "asc" },
+    });
+    const totalBankBalance = banks.reduce((sum, bank) => sum + Number(bank.balance || 0), 0);
+    const totalInMarket = await prisma.customer.aggregate({
+      _sum: { balance: true },
+    });
+
+    console.log(totalInMarket);
+
     const stats = {
       todayBuy: todayBuyQuantity,
       todayBuyTotalAmount,
@@ -63,6 +73,14 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       totalAvailableStock,
       totalWeightLossPercentage,
       todayProfit,
+      banks: banks.map((b) => ({
+        id: b.id,
+        name: b.name,
+        label: b.label,
+        balance: Number(b.balance || 0),
+      })),
+      totalBankBalance,
+      totalInMarket: Number(totalInMarket._sum?.balance || 0),
     };
 
     res.json(stats);
@@ -85,6 +103,100 @@ export const updateDriverStatus = async (req: Request, res: Response) => {
   const { status } = req.body; // ACTIVE / BLOCKED
   await prisma.user.update({ where: { id }, data: { status } });
   res.json({ success: true });
+};
+
+// 2A. Admin Borrowed Money
+export const getBorrowedInfo = async (req: Request, res: Response) => {
+  try {
+    const adminId = (req as any).user?.userId;
+    if (!adminId) return res.status(401).json({ error: "Unauthorized" });
+
+    const rows = await prisma.borrowedMoney.findMany({
+      where: { adminId },
+      orderBy: { borrowedOn: "desc" },
+    });
+
+    res.json(rows);
+  } catch (error) {
+    console.error("Get borrowed info error:", error);
+    res.status(500).json({ error: "Failed to fetch borrowed info" });
+  }
+};
+
+export const addBorrowedInfo = async (req: Request, res: Response) => {
+  try {
+    const adminId = (req as any).user?.userId;
+    if (!adminId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { borrowedMoney, borrowedFrom, borrowedOn } = req.body as {
+      borrowedMoney?: number;
+      borrowedFrom?: string;
+      borrowedOn?: string;
+    };
+
+    const data: any = {};
+    if (borrowedMoney !== undefined) {
+      const amount = Number(borrowedMoney);
+      if (Number.isNaN(amount) || amount < 0) return res.status(400).json({ error: "borrowedMoney must be a number >= 0" });
+      data.borrowedMoney = amount;
+    }
+    if (borrowedFrom !== undefined) data.borrowedFrom = String(borrowedFrom) || null;
+    if (borrowedOn !== undefined) data.borrowedOn = borrowedOn ? new Date(borrowedOn) : null;
+
+    const created = await prisma.borrowedMoney.create({
+      data: {
+        adminId,
+        borrowedMoney: data.borrowedMoney ?? 0,
+        borrowedFrom: data.borrowedFrom ?? null,
+        borrowedOn: data.borrowedOn ?? null,
+      },
+    });
+
+    res.json(created);
+  } catch (error) {
+    console.error("Add borrowed info error:", error);
+    res.status(500).json({ error: "Failed to add borrowed info" });
+  }
+};
+
+export const updateBorrowedInfo = async (req: Request, res: Response) => {
+  try {
+    const adminId = (req as any).user?.userId;
+    if (!adminId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { id } = req.params;
+    const { borrowedMoney, borrowedFrom, borrowedOn } = req.body as {
+      borrowedMoney?: number;
+      borrowedFrom?: string;
+      borrowedOn?: string;
+    };
+
+    const existing = await prisma.borrowedMoney.findUnique({ where: { id } });
+    if (!existing || existing.adminId !== adminId) {
+      return res.status(404).json({ error: "Borrowed entry not found" });
+    }
+
+    const data: any = {};
+    if (borrowedMoney !== undefined) {
+      const amount = Number(borrowedMoney);
+      if (Number.isNaN(amount) || amount < 0) return res.status(400).json({ error: "borrowedMoney must be a number >= 0" });
+      data.borrowedMoney = amount;
+    }
+    if (borrowedFrom !== undefined) data.borrowedFrom = String(borrowedFrom) || null;
+    if (borrowedOn !== undefined) data.borrowedOn = borrowedOn ? new Date(borrowedOn) : null;
+
+    if (Object.keys(data).length === 0) return res.status(400).json({ error: "Nothing to update" });
+
+    const updated = await prisma.borrowedMoney.update({
+      where: { id },
+      data,
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Update borrowed info error:", error);
+    res.status(500).json({ error: "Failed to update borrowed info" });
+  }
 };
 
 export const updateDriver = async (req: Request, res: Response) => {
@@ -197,6 +309,140 @@ export const createDriver = async (req: Request, res: Response) => {
   }
 };
 
+// 2B. Customer Payments Received
+export const getCustomersWithDue = async (req: Request, res: Response) => {
+  try {
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+
+    const where: any = { balance: { gt: 0 } };
+    if (startDate || endDate) {
+      where.updatedAt = {};
+      if (startDate) {
+        const sd = new Date(startDate);
+        if (Number.isNaN(sd.getTime())) return res.status(400).json({ error: "Invalid startDate" });
+        where.updatedAt.gte = sd;
+      }
+      if (endDate) {
+        const ed = new Date(endDate);
+        if (Number.isNaN(ed.getTime())) return res.status(400).json({ error: "Invalid endDate" });
+        ed.setHours(23, 59, 59, 999);
+        where.updatedAt.lte = ed;
+      }
+    }
+
+    const customers = await prisma.customer.findMany({
+      where,
+      orderBy: { name: "asc" },
+    });
+    res.json(customers);
+  } catch (error) {
+    console.error("Get customers with due error:", error);
+    res.status(500).json({ error: "Failed to fetch customers" });
+  }
+};
+
+export const receiveCustomerPayment = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { amount, method, bankId } = req.body as {
+      amount: number;
+      method: "CASH" | "BANK";
+      bankId?: string;
+    };
+
+    const numericAmount = Number(amount);
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ error: "amount must be a number > 0" });
+    }
+    if (!["CASH", "BANK"].includes(method)) {
+      return res.status(400).json({ error: "method must be CASH or BANK" });
+    }
+    if (method === "BANK" && !bankId) {
+      return res.status(400).json({ error: "bankId is required for BANK payments" });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.findUnique({ where: { id } });
+      if (!customer) {
+        throw new Error("CUSTOMER_NOT_FOUND");
+      }
+
+      if (method === "BANK") {
+        const bank = await tx.bank.findUnique({ where: { id: bankId } });
+        if (!bank) {
+          throw new Error("BANK_NOT_FOUND");
+        }
+        await tx.bank.update({
+          where: { id: bankId },
+          data: { balance: { increment: numericAmount } },
+        });
+      }
+
+      if (method === "CASH") {
+        const totalCashId = process.env.TOTAL_CASH_ID;
+        if (!totalCashId) {
+          throw new Error("TOTAL_CASH_ID_NOT_SET");
+        }
+
+        const capital = await tx.totalCapital.findUnique({ where: { id: totalCashId } });
+        if (!capital) {
+          throw new Error("TOTAL_CAPITAL_NOT_FOUND");
+        }
+
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        let todayCashUpdate: number;
+        if (capital.cashLastUpdatedAt) {
+          const lastUpdated = new Date(capital.cashLastUpdatedAt);
+          const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
+          if (lastUpdatedDay.getTime() === today.getTime()) {
+            todayCashUpdate = Number(capital.todayCash) + numericAmount;
+          } else {
+            todayCashUpdate = numericAmount;
+          }
+        } else {
+          todayCashUpdate = numericAmount;
+        }
+
+        await tx.totalCapital.update({
+          where: { id: totalCashId },
+          data: {
+            totalCash: { increment: numericAmount },
+            todayCash: todayCashUpdate,
+            cashLastUpdatedAt: now,
+          },
+        });
+      }
+
+      const newBalance = Math.max(0, Number(customer.balance) - numericAmount);
+      const updatedCustomer = await tx.customer.update({
+        where: { id },
+        data: { balance: newBalance },
+      });
+
+      return updatedCustomer;
+    });
+
+    res.json({ success: true, customer: result });
+  } catch (error: any) {
+    if (error?.message === "CUSTOMER_NOT_FOUND") {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+    if (error?.message === "BANK_NOT_FOUND") {
+      return res.status(404).json({ error: "Bank not found" });
+    }
+    if (error?.message === "TOTAL_CASH_ID_NOT_SET") {
+      return res.status(400).json({ error: "TOTAL_CASH_ID is not configured" });
+    }
+    if (error?.message === "TOTAL_CAPITAL_NOT_FOUND") {
+      return res.status(404).json({ error: "Total capital record not found" });
+    }
+    console.error("Receive customer payment error:", error);
+    res.status(500).json({ error: "Failed to receive payment" });
+  }
+};
+
 // 3. Financials (Debit/Credit Notes)
 export const createFinancialNote = async (req: Request, res: Response) => {
   const { customerId, type, amount, reason } = req.body; // type: DEBIT_NOTE or CREDIT_NOTE
@@ -293,7 +539,7 @@ export const getCashToBank = async (req: Request, res: Response) => {
 
 export const createCashToBank = async (req: Request, res: Response) => {
   try {
-    const { bankName, amount, date } = req.body as { bankName: string; amount: number; date?: string };
+    const { bankName, amount, date, bankId } = req.body as { bankName: string; amount: number; date?: string; bankId: string };
 
     if (!bankName || String(bankName).trim() === "") return res.status(400).json({ error: "bankName is required" });
     const numericAmount = Number(amount);
@@ -302,13 +548,50 @@ export const createCashToBank = async (req: Request, res: Response) => {
     const parsedDate = date ? new Date(date) : new Date();
     if (Number.isNaN(parsedDate.getTime())) return res.status(400).json({ error: "Invalid date" });
 
-    const created = await prisma.cashToBank.create({
-      data: {
-        bankName: String(bankName).trim(),
-        amount: numericAmount,
-        date: parsedDate,
-        // operation defaults to DEPOSIT in schema
-      },
+    const created = await prisma.$transaction(async (tx) => {
+      const cashToBank = await tx.cashToBank.create({
+        data: {
+          bankName: String(bankName).trim(),
+          amount: numericAmount,
+          date: parsedDate,
+          bankId,
+          // operation defaults to DEPOSIT in schema
+        },
+      });
+
+      if (process.env.TOTAL_CASH_ID) {
+        const capitalRecord = await tx.totalCapital.findUnique({
+          where: { id: process.env.TOTAL_CASH_ID },
+        });
+
+        if (capitalRecord) {
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          let todayCashUpdate: number | undefined;
+
+          if (capitalRecord.cashLastUpdatedAt) {
+            const lastUpdated = new Date(capitalRecord.cashLastUpdatedAt);
+            const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
+            if (lastUpdatedDay.getTime() === today.getTime()) {
+              todayCashUpdate = Number(capitalRecord.todayCash) - numericAmount;
+            }
+          }
+
+          const data: any = {
+            totalCash: { decrement: numericAmount },
+          };
+          if (todayCashUpdate !== undefined) {
+            data.todayCash = todayCashUpdate;
+          }
+
+          await tx.totalCapital.update({
+            where: { id: process.env.TOTAL_CASH_ID },
+            data,
+          });
+        }
+      }
+
+      return cashToBank;
     });
 
     res.json({ success: true, cashToBank: created });
@@ -509,6 +792,95 @@ export const deleteVehicle = async (req: Request, res: Response) => {
   }
 };
 
+// 6. Bank Management
+export const getBanks = async (req: Request, res: Response) => {
+  try {
+    const banks = await prisma.bank.findMany({
+      orderBy: { createdAt: "asc" },
+    });
+    res.json(banks);
+  } catch (error) {
+    console.error("Get banks error:", error);
+    res.status(500).json({ error: "Failed to fetch banks" });
+  }
+};
+
+export const updateBank = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, label, balance } = req.body as { name?: string; label?: string; balance?: number };
+
+    const bank = await prisma.bank.findUnique({ where: { id } });
+    if (!bank) {
+      return res.status(404).json({ error: "Bank not found" });
+    }
+
+    const data: any = {};
+    if (name !== undefined) {
+      if (String(name).trim() === "") return res.status(400).json({ error: "name cannot be empty" });
+      data.name = String(name).trim();
+    }
+    if (label !== undefined) {
+      data.label = String(label).trim();
+    }
+    if (balance !== undefined) {
+      const numericBalance = Number(balance);
+      if (Number.isNaN(numericBalance)) return res.status(400).json({ error: "balance must be a number" });
+      data.balance = numericBalance;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: "Nothing to update" });
+    }
+
+    const updated = await prisma.bank.update({
+      where: { id },
+      data,
+    });
+
+    res.json({ success: true, bank: updated });
+  } catch (error) {
+    console.error("Update bank error:", error);
+    res.status(500).json({ error: "Failed to update bank" });
+  }
+};
+
+// 6B. Total Capital
+export const getTotalCapital = async (req: Request, res: Response) => {
+  try {
+    const totalCashId = process.env.TOTAL_CASH_ID;
+    if (!totalCashId) {
+      return res.status(400).json({ error: "TOTAL_CASH_ID is not configured" });
+    }
+
+    let capital = await prisma.totalCapital.findUnique({
+      where: { id: totalCashId },
+    });
+    if (!capital) {
+      return res.status(404).json({ error: "Total capital record not found" });
+    }
+
+    if (capital.cashLastUpdatedAt) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const lastUpdated = new Date(capital.cashLastUpdatedAt);
+      const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
+
+      if (lastUpdatedDay.getTime() < today.getTime()) {
+        capital = await prisma.totalCapital.update({
+          where: { id: totalCashId },
+          data: { todayCash: 0 },
+        });
+      }
+    }
+
+    res.json(capital);
+  } catch (error) {
+    console.error("Get total capital error:", error);
+    res.status(500).json({ error: "Failed to fetch total capital" });
+  }
+};
+
 // --- Routes ---
 const router = Router();
 router.use(authenticate); // Admin Middleware Check Needed ideally
@@ -519,6 +891,11 @@ router.post("/drivers", createDriver);
 router.put("/drivers/:id", updateDriver);
 router.delete("/drivers/:id", deleteDriver);
 router.put("/drivers/:id/status", updateDriverStatus);
+router.get("/borrowed-money", getBorrowedInfo);
+router.post("/borrowed-money", addBorrowedInfo);
+router.put("/borrowed-money/:id", updateBorrowedInfo);
+router.get("/customers/due", getCustomersWithDue);
+router.post("/customers/:id/receive-payment", receiveCustomerPayment);
 router.post("/financial/note", createFinancialNote);
 router.get("/cash-to-bank", getCashToBank);
 router.post("/cash-to-bank", createCashToBank);
@@ -532,5 +909,12 @@ router.get("/vehicles", getVehicles);
 router.get("/vehicles/:id", getVehicleById);
 router.post("/vehicles", createVehicle);
 router.delete("/vehicles/:id", deleteVehicle);
+
+// Bank routes
+router.get("/banks", getBanks);
+router.put("/banks/:id", updateBank);
+
+// Total capital routes
+router.get("/total-capital", getTotalCapital);
 
 export default router;

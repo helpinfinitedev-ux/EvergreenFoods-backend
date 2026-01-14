@@ -2,10 +2,7 @@ export function buildOtpEmail(params: { otp: string; expiresMinutes: number }) {
   const { otp, expiresMinutes } = params;
   const subject = `Evergreen Foods OTP (${expiresMinutes} min)`;
 
-  const text =
-    `Your Evergreen Foods OTP is: ${otp}\n` +
-    `This OTP expires in ${expiresMinutes} minutes.\n\n` +
-    `If you did not attempt to log in, you can ignore this email.`;
+  const text = `Your Evergreen Foods OTP is: ${otp}\n` + `This OTP expires in ${expiresMinutes} minutes.\n\n` + `If you did not attempt to log in, you can ignore this email.`;
 
   const html = `
     <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #111827;">
@@ -22,4 +19,3 @@ export function buildOtpEmail(params: { otp: string; expiresMinutes: number }) {
 
   return { subject, text, html };
 }
-

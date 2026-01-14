@@ -56,6 +56,7 @@ model User {
 
   // Relations
   transactions Transaction[]
+  borrowedMoneyEntries BorrowedMoney[]
   vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
   vehicleId    String?
 
@@ -102,7 +103,6 @@ model Transaction {
   rate       Decimal? // Price per unit
   totalAmount Decimal? // Total value
   companyName String? // Company name for buy/sell
-
   paymentCash Decimal? @default(0)
   paymentUpi  Decimal? @default(0)
 
@@ -150,21 +150,78 @@ model Expense {
   description String
   category    String?     // Optional: Rent, Salary, Utilities, etc.
   date        DateTime    @default(now())
+  bank        Bank?       @relation(fields: [bankId], references: [id])
+  bankId      String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
   @@map("expenses")
 }
 
+model totalCapital {
+  id String @id @default(uuid())
+  totalCash Decimal @default(0)
+  todayCash Decimal @default(0)
+  cashLastUpdatedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("total_capital")
+}
+
+model Bank {
+  id String @id @default(uuid())
+  name String
+  label String
+  balance Decimal @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt 
+
+  cashToBank CashToBank[]
+  payments   Payments[]
+  expenses   Expense[]
+
+
+  @@map("bank")
+}
 
 model CashToBank {
   id String @id @default(uuid())
   amount Decimal @default(0)
   bankName String
+  bank Bank @relation(fields: [bankId], references: [id])
+  bankId String 
   operation CashToBankOperation @default(DEPOSIT)
   date DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("cash_to_bank")
+}
+
+model Payments {
+  id String @id @default(uuid())
+  amount Decimal @default(0)
+  companyName String?
+  description String?
+  date DateTime @default(now())
+  bank Bank? @relation(fields: [bankId], references: [id])
+  bankId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payments")
+}
+
+model BorrowedMoney {
+  id           String   @id @default(uuid())
+  borrowedMoney Decimal @default(0)
+  borrowedFrom  String?
+  borrowedOn    DateTime?
+  admin         User    @relation(fields: [adminId], references: [id])
+  adminId       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("borrowed_money")
 }

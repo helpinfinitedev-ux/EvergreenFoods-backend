@@ -11,6 +11,7 @@ import customerRoutes from "./routes/customerRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
 import expenseRoutes from "./routes/expenseRoutes";
+import paymentRoutes from "./routes/paymentRoutes";
 
 app.use(cors());
 app.use(express.json());
@@ -21,6 +22,7 @@ app.use("/api/customers", customerRoutes);
 app.use("/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/admin/expenses", expenseRoutes);
+app.use("/admin/payments", paymentRoutes);
 
 // Health Check
 app.get("/", (req, res) => {

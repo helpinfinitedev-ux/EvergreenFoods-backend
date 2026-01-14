@@ -80,7 +80,14 @@ export const getExpenseSummary = async (req: Request, res: Response) => {
 // POST create a new expense
 export const createExpense = async (req: Request, res: Response) => {
   try {
-    const { type, amount, description, category, date } = req.body;
+    const { type, amount, description, category, date, bankId } = req.body as {
+      type: "CASH" | "BANK";
+      amount: number;
+      description: string;
+      category?: string;
+      date?: string;
+      bankId?: string;
+    };
 
     if (!type || !amount || !description) {
       return res.status(400).json({ error: "Type, amount, and description are required" });
@@ -90,18 +97,90 @@ export const createExpense = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Type must be CASH or BANK" });
     }
 
-    const expense = await prisma.expense.create({
-      data: {
-        type,
-        amount: parseFloat(amount),
-        description,
-        category: category || null,
-        date: date ? new Date(date) : new Date(),
-      },
+    const numericAmount = Number(amount);
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ error: "amount must be a number > 0" });
+    }
+
+    if (type === "BANK" && !bankId) {
+      return res.status(400).json({ error: "bankId is required for BANK expenses" });
+    }
+
+    const created = await prisma.$transaction(async (tx) => {
+      if (type === "BANK") {
+        const bank = await tx.bank.findUnique({ where: { id: bankId } });
+        if (!bank) {
+          throw new Error("BANK_NOT_FOUND");
+        }
+
+        await tx.bank.update({
+          where: { id: bankId },
+          data: { balance: { decrement: numericAmount } },
+        });
+      }
+
+      if (type === "CASH") {
+        const totalCashId = process.env.TOTAL_CASH_ID;
+        if (!totalCashId) {
+          throw new Error("TOTAL_CASH_ID_NOT_SET");
+        }
+
+        const capital = await tx.totalCapital.findUnique({ where: { id: totalCashId } });
+        if (!capital) {
+          throw new Error("TOTAL_CAPITAL_NOT_FOUND");
+        }
+
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        let todayCashUpdate: number | undefined;
+
+        if (capital.cashLastUpdatedAt) {
+          const lastUpdated = new Date(capital.cashLastUpdatedAt);
+          const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
+          if (lastUpdatedDay.getTime() === today.getTime()) {
+            const nextTodayCash = Number(capital.todayCash) - numericAmount;
+            todayCashUpdate = Math.max(0, nextTodayCash);
+          } else if (lastUpdatedDay.getTime() < today.getTime()) {
+            todayCashUpdate = 0;
+          }
+        }
+
+        const data: any = {
+          totalCash: { decrement: numericAmount },
+        };
+        if (todayCashUpdate !== undefined) {
+          data.todayCash = todayCashUpdate;
+        }
+
+        await tx.totalCapital.update({
+          where: { id: totalCashId },
+          data,
+        });
+      }
+
+      return tx.expense.create({
+        data: {
+          type,
+          amount: numericAmount,
+          description,
+          category: category || null,
+          date: date ? new Date(date) : new Date(),
+          bankId: type === "BANK" ? bankId : null,
+        },
+      });
     });
 
-    res.status(201).json(expense);
-  } catch (error) {
+    res.status(201).json(created);
+  } catch (error: any) {
+    if (error?.message === "BANK_NOT_FOUND") {
+      return res.status(404).json({ error: "Bank not found" });
+    }
+    if (error?.message === "TOTAL_CASH_ID_NOT_SET") {
+      return res.status(400).json({ error: "TOTAL_CASH_ID is not configured" });
+    }
+    if (error?.message === "TOTAL_CAPITAL_NOT_FOUND") {
+      return res.status(404).json({ error: "Total capital record not found" });
+    }
     console.error("Create expense error:", error);
     res.status(500).json({ error: "Failed to create expense" });
   }

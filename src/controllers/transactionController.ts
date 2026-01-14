@@ -109,6 +109,44 @@ export const addSellEntry = async (req: Request, res: Response) => {
         },
       });
 
+      // Update totalCapital with paymentCash
+      const cashAmount = Number(paymentCash || 0);
+      if (cashAmount > 0 && process.env.TOTAL_CASH_ID) {
+        // Fetch current totalCapital record
+        const capitalRecord = await tx.totalCapital.findUnique({
+          where: { id: process.env.TOTAL_CASH_ID },
+        });
+
+        if (capitalRecord) {
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+          // Check if cashLastUpdatedAt is from a previous day
+          let newTodayCash = cashAmount;
+          if (capitalRecord.cashLastUpdatedAt) {
+            const lastUpdated = new Date(capitalRecord.cashLastUpdatedAt);
+            const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
+
+            // If last updated is today, add to existing todayCash
+            if (lastUpdatedDay.getTime() === today.getTime()) {
+              newTodayCash = Number(capitalRecord.todayCash) + cashAmount;
+            }
+            // If last updated is before today, todayCash resets to just the new cashAmount
+          }
+
+          await tx.totalCapital.update({
+            where: { id: process.env.TOTAL_CASH_ID },
+            data: {
+              totalCash: {
+                increment: cashAmount,
+              },
+              todayCash: newTodayCash,
+              cashLastUpdatedAt: now,
+            },
+          });
+        }
+      }
+
       return transaction;
     });
 
