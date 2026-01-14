@@ -49,6 +49,8 @@ model User {
   role         Role     @default(DRIVER)
   status       String   @default("ACTIVE")
   baseSalary   Decimal? @default(0) // Added for Salary
+  otp          String?
+  otpExpiry    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
