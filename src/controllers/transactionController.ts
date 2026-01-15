@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { prisma } from "../app";
 import { AuthRequest } from "../middleware/authMiddleware";
 import { getDriverStock, getDashboardStats } from "../services/stockService";
+import { endOfDay, startOfDay } from "date-fns";
 
 // Dashboard Summary
 export const getDashboardSummary = async (req: Request, res: Response) => {
@@ -212,6 +213,27 @@ export const addWeightLoss = async (req: Request, res: Response) => {
     const userId = (req as AuthRequest).user?.userId;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
     const { amount, subType, details, imageUrl } = req.body;
+    const date: Date = new Date();
+    const start = startOfDay(date);
+    const end = endOfDay(date);
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        driverId: userId,
+        date: { gte: start, lte: end },
+      },
+    });
+
+    const todayBuyKg = transactions.filter((t) => t.type === "BUY" || t.type === "SHOP_BUY" || (t.type === "PALTI" && t.paltiAction === "ADD")).reduce((sum, t) => sum + Number(t.amount), 0);
+    const todaySellKg = transactions.filter((t) => t.type === "SELL" || (t.type === "PALTI" && t.paltiAction === "SUBTRACT")).reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const todayWeightLoss = transactions.filter((t) => t.type === "WEIGHT_LOSS").reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const todayStock = todayBuyKg - todaySellKg - todayWeightLoss;
+
+    if (amount > todayStock) {
+      res.status(400).json({ error: "Weight loss greater than today stock" });
+      return;
+    }
 
     const tx = await prisma.transaction.create({
       data: {
