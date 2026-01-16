@@ -3,6 +3,7 @@ import { prisma } from "../app";
 import { AuthRequest } from "../middleware/authMiddleware";
 import { getDriverStock, getDashboardStats } from "../services/stockService";
 import { endOfDay, startOfDay } from "date-fns";
+import { uploadImageFromUri } from "../utils/firebase";
 
 // Dashboard Summary
 export const getDashboardSummary = async (req: Request, res: Response) => {
@@ -223,6 +224,8 @@ export const addWeightLoss = async (req: Request, res: Response) => {
       },
     });
 
+    const uploadedImageUrl = await uploadImageFromUri(imageUrl, "weight-loss");
+    console.log(imageUrl, uploadedImageUrl);
     const todayBuyKg = transactions.filter((t) => t.type === "BUY" || t.type === "SHOP_BUY" || (t.type === "PALTI" && t.paltiAction === "ADD")).reduce((sum, t) => sum + Number(t.amount), 0);
     const todaySellKg = transactions.filter((t) => t.type === "SELL" || (t.type === "PALTI" && t.paltiAction === "SUBTRACT")).reduce((sum, t) => sum + Number(t.amount), 0);
 
@@ -243,11 +246,12 @@ export const addWeightLoss = async (req: Request, res: Response) => {
         amount,
         unit: "KG",
         details,
-        imageUrl,
+        imageUrl: uploadedImageUrl,
       },
     });
     res.json(tx);
   } catch (e) {
+    console;
     res.status(500).json({ error: "Failed" });
   }
 };

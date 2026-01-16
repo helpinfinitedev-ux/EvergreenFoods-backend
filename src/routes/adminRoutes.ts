@@ -649,7 +649,7 @@ export const deleteCashToBank = async (req: Request, res: Response) => {
 
 // 4. Reports (Transactions)
 export const getAdminTransactions = async (req: Request, res: Response) => {
-  const { type, startDate, endDate, driverId, details } = req.query;
+  const { type, startDate, endDate, driverId, details, page } = req.query;
 
   const where: any = {};
   if (type) where.type = type;
@@ -667,11 +667,36 @@ export const getAdminTransactions = async (req: Request, res: Response) => {
     };
   }
 
+  const pageNum = Math.max(1, Number(page) || 1);
+  const pageSize = 50;
+
+  if (page !== undefined) {
+    const skip = (pageNum - 1) * pageSize;
+    const [total, rows] = await Promise.all([
+      prisma.transaction.count({ where }),
+      prisma.transaction.findMany({
+        where,
+        include: { driver: true, customer: true, vehicle: true },
+        orderBy: { date: "desc" },
+        skip,
+        take: pageSize,
+      }),
+    ]);
+    res.json({
+      page: pageNum,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      rows,
+    });
+    return;
+  }
+
   const logs = await prisma.transaction.findMany({
     where,
     include: { driver: true, customer: true, vehicle: true },
     orderBy: { date: "desc" },
-    take: 100, // Pagination later
+    take: 100, // fallback for non-paginated calls
   });
   res.json(logs);
 };
@@ -734,11 +759,11 @@ export const createVehicle = async (req: Request, res: Response) => {
   }
 };
 
-// Update Transaction (for editing rate/totalAmount)
+// Update Transaction (for editing amount/rate/totalAmount)
 export const updateTransaction = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { rate, totalAmount, details } = req.body;
+    const { amount, rate, totalAmount, details } = req.body;
 
     const transaction = await prisma.transaction.findUnique({ where: { id } });
     if (!transaction) {
@@ -748,6 +773,7 @@ export const updateTransaction = async (req: Request, res: Response) => {
     const updated = await prisma.transaction.update({
       where: { id },
       data: {
+        amount: amount !== undefined ? Number(amount) : transaction.amount,
         rate: rate !== undefined ? Number(rate) : transaction.rate,
         totalAmount: totalAmount !== undefined ? Number(totalAmount) : transaction.totalAmount,
         details: details !== undefined ? (String(details).trim() === "" ? null : String(details)) : transaction.details,
