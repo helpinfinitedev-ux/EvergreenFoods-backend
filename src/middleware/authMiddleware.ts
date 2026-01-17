@@ -21,6 +21,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     return res.status(401).json({ error: "Invalid Token" });
   }
   if (decoded.status !== "ACTIVE") {
+    console.log("Inactive User");
     return res.status(401).json({ error: "Inactive User" });
   }
   (req as AuthRequest).user = decoded;

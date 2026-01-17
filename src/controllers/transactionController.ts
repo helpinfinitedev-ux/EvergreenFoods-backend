@@ -224,8 +224,8 @@ export const addWeightLoss = async (req: Request, res: Response) => {
       },
     });
 
-    const uploadedImageUrl = await uploadImageFromUri(imageUrl, "weight-loss");
-    console.log(imageUrl, uploadedImageUrl);
+    // const uploadedImageUrl = await uploadImageFromUri(imageUrl, "weight-loss");
+    // console.log(imageUrl, uploadedImageUrl);
     const todayBuyKg = transactions.filter((t) => t.type === "BUY" || t.type === "SHOP_BUY" || (t.type === "PALTI" && t.paltiAction === "ADD")).reduce((sum, t) => sum + Number(t.amount), 0);
     const todaySellKg = transactions.filter((t) => t.type === "SELL" || (t.type === "PALTI" && t.paltiAction === "SUBTRACT")).reduce((sum, t) => sum + Number(t.amount), 0);
 
@@ -234,7 +234,8 @@ export const addWeightLoss = async (req: Request, res: Response) => {
     const todayStock = todayBuyKg - todaySellKg - todayWeightLoss;
 
     if (amount > todayStock) {
-      res.status(400).json({ error: "Weight loss greater than today stock" });
+      console.log("Weight loss greater than today stock");
+      res.status(400).json({ message: "Weight loss greater than today stock" });
       return;
     }
 
@@ -246,7 +247,7 @@ export const addWeightLoss = async (req: Request, res: Response) => {
         amount,
         unit: "KG",
         details,
-        imageUrl: uploadedImageUrl,
+        imageUrl,
       },
     });
     res.json(tx);

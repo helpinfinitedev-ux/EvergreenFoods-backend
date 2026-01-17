@@ -132,6 +132,7 @@ export const getMe = async (req: AuthRequest, res: Response) => {
         name: true,
         mobile: true,
         role: true,
+        status:true,
       },
     });
 

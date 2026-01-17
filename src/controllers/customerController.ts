@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../app';
+import { AuthRequest } from '../middleware/authMiddleware';
 
 export const getCustomers = async (req: Request, res: Response) => {
     try {
@@ -29,6 +30,31 @@ export const addCustomer = async (req: Request, res: Response) => {
     }
 };
 
+export const updateCustomer = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { name, mobile, address, balance } = req.body;
+
+        const data: { name?: string; mobile?: string; address?: string | null; balance?: number } = {};
+        if (name !== undefined) data.name = name;
+        if (mobile !== undefined) data.mobile = mobile;
+        if (address !== undefined) data.address = address || null;
+        if (balance !== undefined) data.balance = Number(balance);
+
+        if (Object.keys(data).length === 0) {
+            return res.status(400).json({ error: "Nothing to update" });
+        }
+
+        const updated = await prisma.customer.update({
+            where: { id },
+            data,
+        });
+        res.json(updated);
+    } catch (e) {
+        res.status(400).json({ error: "Failed to update customer" });
+    }
+};
+
 export const getCustomerHistory = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
@@ -47,5 +73,53 @@ export const getCustomerHistory = async (req: Request, res: Response) => {
         res.json(history);
     } catch (e) {
         res.status(500).json({ error: 'Failed' });
+    }
+};
+
+export const addCustomerAdvance = async (req: Request, res: Response) => {
+    try {
+        const userId = (req as AuthRequest).user?.userId;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const { id } = req.params;
+        const { amount, details } = req.body as { amount: number; details?: string };
+
+        const numericAmount = Number(amount);
+        if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+            return res.status(400).json({ error: 'amount must be a number > 0' });
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            const customer = await tx.customer.findUnique({ where: { id } });
+            if (!customer) {
+                throw new Error('CUSTOMER_NOT_FOUND');
+            }
+
+            await tx.transaction.create({
+                data: {
+                    driverId: userId,
+                    customerId: id,
+                    type: 'ADVANCE_PAYMENT',
+                    amount: numericAmount,
+                    unit: 'INR',
+                    totalAmount: numericAmount,
+                    details: details?.trim() || 'Advance payment',
+                },
+            });
+
+            const updatedCustomer = await tx.customer.update({
+                where: { id },
+                data: { balance: { increment: -numericAmount } },
+            });
+
+            return updatedCustomer;
+        });
+
+        res.json({ success: true, customer: result });
+    } catch (e: any) {
+        if (e?.message === 'CUSTOMER_NOT_FOUND') {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+        res.status(500).json({ error: 'Failed to add customer advance' });
     }
 };

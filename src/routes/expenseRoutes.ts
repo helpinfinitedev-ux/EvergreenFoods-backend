@@ -57,13 +57,9 @@ export const getExpenseSummary = async (req: Request, res: Response) => {
 
     const expenses = await prisma.expense.findMany({ where });
 
-    const cashTotal = expenses
-      .filter((e) => e.type === "CASH")
-      .reduce((sum, e) => sum + Number(e.amount), 0);
+    const cashTotal = expenses.filter((e) => e.type === "CASH").reduce((sum, e) => sum + Number(e.amount), 0);
 
-    const bankTotal = expenses
-      .filter((e) => e.type === "BANK")
-      .reduce((sum, e) => sum + Number(e.amount), 0);
+    const bankTotal = expenses.filter((e) => e.type === "BANK").reduce((sum, e) => sum + Number(e.amount), 0);
 
     res.json({
       cashTotal,
@@ -112,6 +108,9 @@ export const createExpense = async (req: Request, res: Response) => {
         if (!bank) {
           throw new Error("BANK_NOT_FOUND");
         }
+        if (Number(bank.balance || 0) - numericAmount < 0) {
+          throw new Error("BANK_INSUFFICIENT_FUNDS");
+        }
 
         await tx.bank.update({
           where: { id: bankId },
@@ -145,6 +144,10 @@ export const createExpense = async (req: Request, res: Response) => {
           }
         }
 
+        if (+capital?.totalCash - numericAmount < 0) {
+          return res.status(400).json({ error: "Total cash is not enough" });
+        }
+
         const data: any = {
           totalCash: { decrement: numericAmount },
         };
@@ -174,6 +177,9 @@ export const createExpense = async (req: Request, res: Response) => {
   } catch (error: any) {
     if (error?.message === "BANK_NOT_FOUND") {
       return res.status(404).json({ error: "Bank not found" });
+    }
+    if (error?.message === "BANK_INSUFFICIENT_FUNDS") {
+      return res.status(400).json({ error: "Not enough momey in bank" });
     }
     if (error?.message === "TOTAL_CASH_ID_NOT_SET") {
       return res.status(400).json({ error: "TOTAL_CASH_ID is not configured" });
@@ -255,4 +261,3 @@ router.put("/:id", updateExpense);
 router.delete("/:id", deleteExpense);
 
 export default router;
-

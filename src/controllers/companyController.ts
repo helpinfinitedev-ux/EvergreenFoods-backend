@@ -8,6 +8,7 @@ export const getCompanies = async (req: Request, res: Response) => {
     const pageSize = 10;
     const page = Math.max(1, Number(params.page as string) || 1);
     const skip = (page - 1) * pageSize;
+    const queryObj: any = {};
     if (params.name) {
       where.name = { contains: params.name as string, mode: "insensitive" };
     }
@@ -17,7 +18,15 @@ export const getCompanies = async (req: Request, res: Response) => {
     if (params.address) {
       where.address = { contains: params.address as string, mode: "insensitive" };
     }
-    const [total, companies] = await Promise.all([prisma.company.count({ where }), prisma.company.findMany({ where, orderBy: { name: "asc" }, skip, take: pageSize })]);
+    queryObj.where = where;
+    queryObj.orderBy = { name: "asc" };
+    if (params.page) {
+      queryObj.take = pageSize;
+      queryObj.skip = skip;
+    }
+    // queryObj.include = { company: true };
+    const [total, companies] = await Promise.all([prisma.company.count({ where }), prisma.company.findMany(queryObj)]);
+    // console.log(companies?.length);
     res.json({ page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)), companies });
   } catch (e) {
     res.status(500).json({ error: "Failed to get companies" });

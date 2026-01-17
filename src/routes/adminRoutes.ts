@@ -55,6 +55,9 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
     const totalInMarket = await prisma.customer.aggregate({
       _sum: { balance: true },
     });
+    const totalCompanyDue = await prisma.company.aggregate({
+      _sum: { amountDue: true },
+    });
 
     console.log(totalInMarket);
 
@@ -81,6 +84,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       })),
       totalBankBalance,
       totalInMarket: Number(totalInMarket._sum?.balance || 0),
+      totalCompanyDue: Number(totalCompanyDue._sum?.amountDue || 0),
     };
 
     res.json(stats);
@@ -196,6 +200,27 @@ export const updateBorrowedInfo = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Update borrowed info error:", error);
     res.status(500).json({ error: "Failed to update borrowed info" });
+  }
+};
+
+export const deleteBorrowedInfo = async (req: Request, res: Response) => {
+  try {
+    const adminId = (req as any).user?.userId;
+    if (!adminId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { id } = req.params;
+
+    const existing = await prisma.borrowedMoney.findUnique({ where: { id } });
+    if (!existing || existing.adminId !== adminId) {
+      return res.status(404).json({ error: "Borrowed entry not found" });
+    }
+
+    await prisma.borrowedMoney.delete({ where: { id } });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Delete borrowed info error:", error);
+    res.status(500).json({ error: "Failed to delete borrowed info" });
   }
 };
 
@@ -445,8 +470,9 @@ export const receiveCustomerPayment = async (req: Request, res: Response) => {
 
 // 3. Financials (Debit/Credit Notes)
 export const createFinancialNote = async (req: Request, res: Response) => {
-  const { customerId, type, amount, reason } = req.body; // type: DEBIT_NOTE or CREDIT_NOTE
+  const { customerId, type, amount, reason, weight } = req.body; // type: DEBIT_NOTE or CREDIT_NOTE
   const numericAmount = Number(amount);
+  const numericWeight = weight ? Number(weight) : 0;
 
   if (type !== "DEBIT_NOTE" && type !== "CREDIT_NOTE") return res.status(400).json({ error: "Invalid type" });
 
@@ -457,7 +483,7 @@ export const createFinancialNote = async (req: Request, res: Response) => {
         driverId: (req as any).user.userId, // Admin ID essentially
         customerId,
         type,
-        amount: 0, // Not weight
+        amount: numericWeight, // Store weight/qty
         unit: "INR",
         totalAmount: numericAmount,
         details: reason,
@@ -576,7 +602,9 @@ export const createCashToBank = async (req: Request, res: Response) => {
               todayCashUpdate = Number(capitalRecord.todayCash) - numericAmount;
             }
           }
-
+          if (+capitalRecord?.totalCash - numericAmount < 0) {
+            return res.status(400).json({ error: "Total cash is not enough" });
+          }
           const data: any = {
             totalCash: { decrement: numericAmount },
           };
@@ -649,7 +677,7 @@ export const deleteCashToBank = async (req: Request, res: Response) => {
 
 // 4. Reports (Transactions)
 export const getAdminTransactions = async (req: Request, res: Response) => {
-  const { type, startDate, endDate, driverId, details, page } = req.query;
+  const { type, startDate, endDate, driverId, details, page, companyName } = req.query;
 
   const where: any = {};
   if (type) where.type = type;
@@ -664,6 +692,12 @@ export const getAdminTransactions = async (req: Request, res: Response) => {
     where.details = {
       contains: String(details), // e.g. "abc"
       mode: "insensitive", // optional (case-insensitive)
+    };
+  }
+  if (companyName) {
+    where.companyName = {
+      contains: String(companyName),
+      mode: "insensitive",
     };
   }
 
@@ -738,24 +772,43 @@ export const getVehicleById = async (req: Request, res: Response) => {
 export const createVehicle = async (req: Request, res: Response) => {
   try {
     const { registration, currentKm, status } = req.body;
-
-    const existingVehicle = await prisma.vehicle.findUnique({ where: { registration } });
-    if (existingVehicle) {
-      return res.status(400).json({ error: "Vehicle with this registration already exists" });
-    }
+    if (!registration) return res.status(400).json({ error: "Registration is required" });
 
     const vehicle = await prisma.vehicle.create({
       data: {
         registration,
-        currentKm: currentKm ? Number(currentKm) : 0,
+        currentKm: Number(currentKm || 0),
         status: status || "ACTIVE",
       },
     });
-
-    res.json({ success: true, vehicle });
+    res.json(vehicle);
   } catch (error) {
     console.error("Create vehicle error:", error);
     res.status(500).json({ error: "Failed to create vehicle" });
+  }
+};
+
+export const updateVehicle = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { registration, currentKm, status } = req.body;
+
+    const existing = await prisma.vehicle.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: "Vehicle not found" });
+
+    const data: any = {};
+    if (registration !== undefined) data.registration = registration;
+    if (currentKm !== undefined) data.currentKm = Number(currentKm);
+    if (status !== undefined) data.status = status;
+
+    const updated = await prisma.vehicle.update({
+      where: { id },
+      data,
+    });
+    res.json(updated);
+  } catch (error) {
+    console.error("Update vehicle error:", error);
+    res.status(500).json({ error: "Failed to update vehicle" });
   }
 };
 
@@ -828,6 +881,19 @@ export const getBanks = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Get banks error:", error);
     res.status(500).json({ error: "Failed to fetch banks" });
+  }
+};
+
+export const getBankDetails = async (req: Request, res: Response) => {
+  try {
+    const banks = await prisma.bank.findMany({
+      orderBy: { createdAt: "asc" },
+    });
+    const totalBankBalance = banks.reduce((sum, bank) => sum + Number(bank.balance || 0), 0);
+    res.json({ totalBankBalance, banks });
+  } catch (error) {
+    console.error("Get bank details error:", error);
+    res.status(500).json({ error: "Failed to fetch bank details" });
   }
 };
 
@@ -920,6 +986,7 @@ router.put("/drivers/:id/status", updateDriverStatus);
 router.get("/borrowed-money", getBorrowedInfo);
 router.post("/borrowed-money", addBorrowedInfo);
 router.put("/borrowed-money/:id", updateBorrowedInfo);
+router.delete("/borrowed-money/:id", deleteBorrowedInfo);
 router.get("/customers/due", getCustomersWithDue);
 router.post("/customers/:id/receive-payment", receiveCustomerPayment);
 router.post("/financial/note", createFinancialNote);
@@ -934,10 +1001,12 @@ router.put("/transactions/:id", updateTransaction);
 router.get("/vehicles", getVehicles);
 router.get("/vehicles/:id", getVehicleById);
 router.post("/vehicles", createVehicle);
+router.put("/vehicles/:id", updateVehicle);
 router.delete("/vehicles/:id", deleteVehicle);
 
 // Bank routes
 router.get("/banks", getBanks);
+router.get("/banks/details", getBankDetails);
 router.put("/banks/:id", updateBank);
 
 // Total capital routes
