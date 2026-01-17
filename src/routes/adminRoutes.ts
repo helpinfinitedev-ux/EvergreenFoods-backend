@@ -618,6 +618,18 @@ export const createCashToBank = async (req: Request, res: Response) => {
           });
         }
       }
+      if (bankId) {
+        const bank = await tx.bank.findUnique({ where: { id: bankId } });
+        if (bank) {
+          const data: any = {
+            balance: { increment: numericAmount },
+          };
+          await tx.bank.update({
+            where: { id: bankId },
+            data,
+          });
+        }
+      }
 
       return cashToBank;
     });
@@ -632,7 +644,7 @@ export const createCashToBank = async (req: Request, res: Response) => {
 export const updateCashToBank = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { bankName, amount } = req.body as { bankName?: string; amount?: number };
+    const { bankName, amount, bankId } = req.body as { bankName?: string; amount?: number; bankId?: string };
 
     const existing = await prisma.cashToBank.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: "CashToBank entry not found" });
@@ -642,20 +654,121 @@ export const updateCashToBank = async (req: Request, res: Response) => {
       if (String(bankName).trim() === "") return res.status(400).json({ error: "bankName cannot be empty" });
       data.bankName = String(bankName).trim();
     }
+
+    let newAmount: number | undefined;
     if (amount !== undefined) {
       const numericAmount = Number(amount);
       if (Number.isNaN(numericAmount) || numericAmount <= 0) return res.status(400).json({ error: "amount must be a number > 0" });
+      newAmount = numericAmount;
       data.amount = numericAmount;
     }
+
+    if (bankId !== undefined) {
+      data.bankId = bankId;
+    }
+
     if (Object.keys(data).length === 0) return res.status(400).json({ error: "Nothing to update" });
 
-    const updated = await prisma.cashToBank.update({
-      where: { id },
-      data,
+    const oldAmount = Number(existing.amount);
+    const finalNewAmount = newAmount ?? oldAmount;
+    const amountDifference = finalNewAmount - oldAmount;
+    const oldBankId = existing.bankId;
+    const newBankId = bankId !== undefined ? bankId : oldBankId;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // Update the CashToBank entry
+      const cashToBank = await tx.cashToBank.update({
+        where: { id },
+        data,
+      });
+
+      // Handle totalCash and todayCash adjustments if amount changed
+      if (amountDifference !== 0 && process.env.TOTAL_CASH_ID) {
+        const capitalRecord = await tx.totalCapital.findUnique({
+          where: { id: process.env.TOTAL_CASH_ID },
+        });
+
+        if (capitalRecord) {
+          // If amount increased, we need to decrement more from totalCash
+          // If amount decreased, we need to increment totalCash (add back the difference)
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          let todayCashUpdate: number | undefined;
+
+          if (capitalRecord.cashLastUpdatedAt) {
+            const lastUpdated = new Date(capitalRecord.cashLastUpdatedAt);
+            const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
+            if (lastUpdatedDay.getTime() === today.getTime()) {
+              // Adjust todayCash by the difference
+              todayCashUpdate = Number(capitalRecord.todayCash) - amountDifference;
+            }
+          }
+
+          // Check if we have enough cash for an increase
+          if (amountDifference > 0 && Number(capitalRecord.totalCash) - amountDifference < 0) {
+            throw new Error("INSUFFICIENT_CASH");
+          }
+
+          const capitalData: any = {};
+          if (amountDifference > 0) {
+            capitalData.totalCash = { decrement: amountDifference };
+          } else if (amountDifference < 0) {
+            capitalData.totalCash = { increment: Math.abs(amountDifference) };
+          }
+
+          if (todayCashUpdate !== undefined) {
+            capitalData.todayCash = Math.max(0, todayCashUpdate);
+          }
+
+          if (Object.keys(capitalData).length > 0) {
+            await tx.totalCapital.update({
+              where: { id: process.env.TOTAL_CASH_ID },
+              data: capitalData,
+            });
+          }
+        }
+      }
+
+      // Handle bank balance adjustments
+      // If bank changed, remove from old bank and add to new bank
+      // If only amount changed but same bank, just adjust the difference
+      if (oldBankId && oldBankId !== newBankId) {
+        // Remove old amount from old bank
+        await tx.bank.update({
+          where: { id: oldBankId },
+          data: { balance: { decrement: oldAmount } },
+        });
+      }
+
+      if (newBankId && oldBankId !== newBankId) {
+        // Add new amount to new bank
+        await tx.bank.update({
+          where: { id: newBankId },
+          data: { balance: { increment: finalNewAmount } },
+        });
+      } else if (newBankId && oldBankId === newBankId && amountDifference !== 0) {
+        // Same bank, just adjust by the difference
+        if (amountDifference > 0) {
+          await tx.bank.update({
+            where: { id: newBankId },
+            data: { balance: { increment: amountDifference } },
+          });
+        } else {
+          await tx.bank.update({
+            where: { id: newBankId },
+            data: { balance: { decrement: Math.abs(amountDifference) } },
+          });
+        }
+      }
+
+      return cashToBank;
     });
 
     res.json({ success: true, cashToBank: updated });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.message === "INSUFFICIENT_CASH") {
+      return res.status(400).json({ error: "Not enough cash available for this update" });
+    }
     console.error("Update cash-to-bank error:", error);
     res.status(500).json({ error: "Failed to update cash-to-bank" });
   }
