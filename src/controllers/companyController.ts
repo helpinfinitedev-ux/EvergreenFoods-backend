@@ -47,6 +47,21 @@ export const addCompany = async (req: Request, res: Response) => {
         amountDue: amountDue || 0,
       },
     });
+    if (amountDue < 0) {
+      const totalCashId = process.env.TOTAL_CASH_ID;
+      if (!totalCashId) {
+        return res.status(500).json({ error: "Total cash ID not found" });
+      }
+
+      await prisma.totalCapital.update({
+        where: { id: totalCashId },
+        data: {
+          totalCash: {
+            increment: Math.abs(amountDue),
+          },
+        },
+      });
+    }
     res.json(company);
   } catch (e) {
     res.status(400).json({ error: "Failed to add company" });

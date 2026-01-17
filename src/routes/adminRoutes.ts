@@ -937,6 +937,62 @@ export const updateBank = async (req: Request, res: Response) => {
   }
 };
 
+// Bank to Bank Transfer
+export const bankToBank = async (req: Request, res: Response) => {
+  try {
+    const { fromBankId, toBankId, amount } = req.body as { fromBankId: string; toBankId: string; amount: number };
+
+    if (!fromBankId || !toBankId || !amount) {
+      return res.status(400).json({ error: "fromBankId, toBankId, and amount are required" });
+    }
+
+    if (fromBankId === toBankId) {
+      return res.status(400).json({ error: "Cannot transfer to the same bank" });
+    }
+
+    const numericAmount = Number(amount);
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const fromBank = await tx.bank.findUnique({ where: { id: fromBankId } });
+      if (!fromBank) throw new Error("FROM_BANK_NOT_FOUND");
+
+      const toBank = await tx.bank.findUnique({ where: { id: toBankId } });
+      if (!toBank) throw new Error("TO_BANK_NOT_FOUND");
+
+      if (Number(fromBank.balance || 0) < numericAmount) {
+        throw new Error("INSUFFICIENT_FUNDS");
+      }
+
+      await tx.bank.update({
+        where: { id: fromBankId },
+        data: { balance: { decrement: numericAmount } },
+      });
+
+      await tx.bank.update({
+        where: { id: toBankId },
+        data: { balance: { increment: numericAmount } },
+      });
+    });
+
+    res.json({ success: true, message: "Transfer completed successfully" });
+  } catch (error: any) {
+    if (error?.message === "FROM_BANK_NOT_FOUND") {
+      return res.status(404).json({ error: "Source bank not found" });
+    }
+    if (error?.message === "TO_BANK_NOT_FOUND") {
+      return res.status(404).json({ error: "Destination bank not found" });
+    }
+    if (error?.message === "INSUFFICIENT_FUNDS") {
+      return res.status(400).json({ error: "Insufficient funds in source bank" });
+    }
+    console.error("Bank to bank transfer error:", error);
+    res.status(500).json({ error: "Failed to transfer" });
+  }
+};
+
 // 6B. Total Capital
 export const getTotalCapital = async (req: Request, res: Response) => {
   try {
@@ -1008,6 +1064,7 @@ router.delete("/vehicles/:id", deleteVehicle);
 router.get("/banks", getBanks);
 router.get("/banks/details", getBankDetails);
 router.put("/banks/:id", updateBank);
+router.post("/banks/transfer", bankToBank);
 
 // Total capital routes
 router.get("/total-capital", getTotalCapital);
