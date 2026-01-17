@@ -238,8 +238,29 @@ export const deleteExpense = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Expense not found" });
     }
 
-    await prisma.expense.delete({
-      where: { id },
+    const expenseAmount = Number(existingExpense.amount);
+
+    await prisma.$transaction(async (tx) => {
+      // Restore amount to bank or total cash
+      if (existingExpense.type === "BANK" && existingExpense.bankId) {
+        await tx.bank.update({
+          where: { id: existingExpense.bankId },
+          data: { balance: { increment: expenseAmount } },
+        });
+      } else if (existingExpense.type === "CASH") {
+        const totalCashId = process.env.TOTAL_CASH_ID;
+        if (totalCashId) {
+          await tx.totalCapital.update({
+            where: { id: totalCashId },
+            data: { totalCash: { increment: expenseAmount } },
+          });
+        }
+      }
+
+      // Delete the expense
+      await tx.expense.delete({
+        where: { id },
+      });
     });
 
     res.json({ success: true, message: "Expense deleted successfully" });
