@@ -47,7 +47,8 @@ export const addCompany = async (req: Request, res: Response) => {
         amountDue: amountDue || 0,
       },
     });
-    if (amountDue < 0) {
+    const operationObj = amountDue < 0 ? { increment: Math.abs(amountDue) } : { decrement: Math.abs(amountDue) };
+    if (amountDue) {
       const totalCashId = process.env.TOTAL_CASH_ID;
       if (!totalCashId) {
         return res.status(500).json({ error: "Total cash ID not found" });
@@ -57,7 +58,7 @@ export const addCompany = async (req: Request, res: Response) => {
         where: { id: totalCashId },
         data: {
           totalCash: {
-            increment: Math.abs(amountDue),
+            ...operationObj,
           },
         },
       });
@@ -83,6 +84,22 @@ export const updateCompany = async (req: Request, res: Response) => {
       where: { id },
       data,
     });
+    const operationObj = amountDue < 0 ? { increment: Math.abs(amountDue) } : { decrement: Math.abs(amountDue) };
+    if (amountDue) {
+      const totalCashId = process.env.TOTAL_CASH_ID;
+      if (!totalCashId) {
+        return res.status(500).json({ error: "Total cash ID not found" });
+      }
+
+      await prisma.totalCapital.update({
+        where: { id: totalCashId },
+        data: {
+          totalCash: {
+            ...operationObj,
+          },
+        },
+      });
+    }
     res.json(company);
   } catch (e) {
     res.status(400).json({ error: "Failed to update company" });
