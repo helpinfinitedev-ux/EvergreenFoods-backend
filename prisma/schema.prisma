@@ -209,6 +209,8 @@ model Payments {
   date DateTime @default(now())
   bank Bank? @relation(fields: [bankId], references: [id])
   bankId String?
+  Company Company? @relation(fields: [companyId], references: [id])
+  companyId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
  
