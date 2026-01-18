@@ -232,7 +232,7 @@ model BorrowedMoney {
 
 model Company {
   id String @id @default(uuid())
-  name String
+  name String @unique
   address String?
   mobile String?
   amountDue Decimal @default(0)

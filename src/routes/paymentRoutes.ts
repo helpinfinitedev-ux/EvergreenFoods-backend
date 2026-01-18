@@ -175,14 +175,25 @@ export const updatePayment = async (req: Request, res: Response) => {
       bankId?: string | null;
     };
 
+    const company = await prisma.company.findUnique({
+      where: { name: companyName },
+    });
+
+    if (!company) {
+      return res.status(404).json({ error: "Company not found" });
+    }
+
+    const companyId = company.id;
+
     const existing = await prisma.payments.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ error: "Payment not found" });
     }
 
     const data: any = {};
+    let numericAmount = 0;
     if (amount !== undefined) {
-      const numericAmount = Number(amount);
+      numericAmount = Number(amount);
       if (Number.isNaN(numericAmount) || numericAmount <= 0) {
         return res.status(400).json({ error: "amount must be a number > 0" });
       }
@@ -200,6 +211,11 @@ export const updatePayment = async (req: Request, res: Response) => {
     const updated = await prisma.payments.update({
       where: { id },
       data,
+    });
+
+    await prisma.company.update({
+      where: { id: companyId },
+      data: { amountDue: { decrement: numericAmount } },
     });
 
     res.json(updated);

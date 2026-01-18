@@ -43,6 +43,16 @@ export const addBuyEntry = async (req: Request, res: Response) => {
 
     const { amount, rate, totalAmount, details, imageUrl, companyName } = req.body;
 
+    const company = await prisma.company.findUnique({
+      where: { name: companyName },
+    });
+
+    if (!company) {
+      return res.status(404).json({ error: "Company not found" });
+    }
+
+    const companyId = company.id;
+
     const tx = await prisma.transaction.create({
       data: {
         driverId: userId,
@@ -54,6 +64,7 @@ export const addBuyEntry = async (req: Request, res: Response) => {
         totalAmount: totalAmount,
         details,
         imageUrl,
+        companyId,
       },
     });
     res.json(tx);
@@ -112,7 +123,7 @@ export const addSellEntry = async (req: Request, res: Response) => {
       });
 
       // Update totalCapital with paymentCash
-      const cashAmount = Number(paymentCash  + paymentUpi|| 0);
+      const cashAmount = Number(paymentCash + paymentUpi || 0);
       if (cashAmount > 0 && process.env.TOTAL_CASH_ID) {
         // Fetch current totalCapital record
         const capitalRecord = await tx.totalCapital.findUnique({

@@ -827,7 +827,7 @@ export const getAdminTransactions = async (req: Request, res: Response) => {
       prisma.transaction.count({ where }),
       prisma.transaction.findMany({
         where,
-        include: { driver: true, customer: true, vehicle: true },
+        include: { driver: true, customer: true, vehicle: true, company: true },
         orderBy: { date: "desc" },
         skip,
         take: pageSize,
@@ -933,7 +933,7 @@ export const updateVehicle = async (req: Request, res: Response) => {
 export const updateTransaction = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { amount, rate, totalAmount, details } = req.body;
+    const { amount, rate, totalAmount, details, companyId } = req.body;
 
     const transaction = await prisma.transaction.findUnique({ where: { id } });
     if (!transaction) {
@@ -951,7 +951,21 @@ export const updateTransaction = async (req: Request, res: Response) => {
       include: { driver: true, customer: true, vehicle: true },
     });
 
-    res.json({ success: true, transaction: updated });
+    const company = await prisma.company.findUnique({ where: { id: companyId } });
+    if (!company) {
+      return res.status(404).json({ error: "Company not found" });
+    }
+
+    const updatedCompany = await prisma.company.update({
+      where: { id: companyId },
+      data: {
+        amountDue: {
+          increment: Number(transaction.totalAmount),
+        },
+      },
+    });
+
+    res.json({ success: true, transaction: updated, company: updatedCompany });
   } catch (error) {
     console.error("Update transaction error:", error);
     res.status(500).json({ error: "Failed to update transaction" });
