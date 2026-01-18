@@ -112,7 +112,7 @@ export const addSellEntry = async (req: Request, res: Response) => {
       });
 
       // Update totalCapital with paymentCash
-      const cashAmount = Number(paymentCash || 0);
+      const cashAmount = Number(paymentCash  + paymentUpi|| 0);
       if (cashAmount > 0 && process.env.TOTAL_CASH_ID) {
         // Fetch current totalCapital record
         const capitalRecord = await tx.totalCapital.findUnique({

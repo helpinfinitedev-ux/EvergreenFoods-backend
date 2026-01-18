@@ -16,6 +16,9 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       where: { date: { gte: start, lte: end } },
     });
 
+    const allTransactions = await prisma.transaction.findMany();
+    // const totalCashIn = allTransactions.filter((t) => t.type === "SELL" || t.type === "ADVANCE_PAYMENT").reduce((sum, t) => sum + Number(t.paymentCash || 0) + Number(t.paymentUpi || 0), 0);
+    // const totalCashOut = allTransactions.reduce((sum, t) => sum + Number(t.totalAmount || 0), 0);
     const activeDrivers = await prisma.user.count({ where: { role: "DRIVER", status: "ACTIVE" } });
 
     // Calculate payment received today from SELL transactions
@@ -47,6 +50,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
 
     // Calculate today's profit/loss (Sell - Buy)
     const todayProfit = todaySellTotalAmount - todayBuyTotalAmount;
+    // const totalCash
 
     const banks = await prisma.bank.findMany({
       orderBy: { name: "asc" },
