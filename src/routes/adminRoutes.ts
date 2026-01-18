@@ -954,6 +954,81 @@ export const updateTransaction = async (req: Request, res: Response) => {
   }
 };
 
+export const deleteTransaction = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const transaction = await tx.transaction.findUnique({ where: { id } });
+      if (!transaction) {
+        throw new Error("TRANSACTION_NOT_FOUND");
+      }
+      if (transaction.type !== "SELL") {
+        throw new Error("UNSUPPORTED_TRANSACTION_TYPE");
+      }
+
+      if (transaction.customerId) {
+        const bill = Number(transaction.totalAmount || 0);
+        const paid = Number(transaction.paymentCash || 0) + Number(transaction.paymentUpi || 0);
+        const change = bill - paid;
+        if (change !== 0) {
+          await tx.customer.update({
+            where: { id: transaction.customerId },
+            data: { balance: { increment: -change } },
+          });
+        }
+      }
+
+      const cashAmount = Number(transaction.paymentCash || 0);
+      if (cashAmount > 0) {
+        const totalCashId = process.env.TOTAL_CASH_ID;
+        if (!totalCashId) {
+          throw new Error("TOTAL_CASH_ID_NOT_SET");
+        }
+
+        const transactionDate = new Date(transaction.date);
+        const today = new Date();
+        const transactionDay = new Date(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
+        const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const isToday = transactionDay.getTime() === todayDay.getTime();
+
+        const capital = await tx.totalCapital.findUnique({ where: { id: totalCashId } });
+        if (!capital) {
+          throw new Error("TOTAL_CAPITAL_NOT_FOUND");
+        }
+
+        await tx.totalCapital.update({
+          where: { id: totalCashId },
+          data: {
+            totalCash: { decrement: cashAmount },
+            ...(isToday ? { todayCash: { decrement: cashAmount }, cashLastUpdatedAt: new Date() } : {}),
+          },
+        });
+      }
+
+      await tx.transaction.delete({ where: { id } });
+      return { success: true };
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    if (error?.message === "TRANSACTION_NOT_FOUND") {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+    if (error?.message === "UNSUPPORTED_TRANSACTION_TYPE") {
+      return res.status(400).json({ error: "Only SELL transactions can be deleted here" });
+    }
+    if (error?.message === "TOTAL_CASH_ID_NOT_SET") {
+      return res.status(400).json({ error: "TOTAL_CASH_ID is not configured" });
+    }
+    if (error?.message === "TOTAL_CAPITAL_NOT_FOUND") {
+      return res.status(404).json({ error: "Total capital record not found" });
+    }
+    console.error("Delete transaction error:", error);
+    res.status(500).json({ error: "Failed to delete transaction" });
+  }
+};
+
 export const deleteVehicle = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -1165,6 +1240,7 @@ router.put("/cash-to-bank/:id", updateCashToBank);
 router.delete("/cash-to-bank/:id", deleteCashToBank);
 router.get("/transactions", getAdminTransactions);
 router.put("/transactions/:id", updateTransaction);
+router.delete("/transactions/:id", deleteTransaction);
 
 // Vehicle routes
 router.get("/vehicles", getVehicles);
