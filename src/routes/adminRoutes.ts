@@ -449,6 +449,16 @@ export const receiveCustomerPayment = async (req: Request, res: Response) => {
         where: { id },
         data: { balance: newBalance },
       });
+      const updatedTransaction = await tx.transaction.create({
+        data: {
+          type: "RECEIVE_PAYMENT",
+          amount: 0,
+          totalAmount: numericAmount,
+          customerId: id,
+          unit: "INR",
+          driverId: (req as any).user.userId,
+        },
+      });
 
       return updatedCustomer;
     });
