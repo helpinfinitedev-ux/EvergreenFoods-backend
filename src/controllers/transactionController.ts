@@ -244,7 +244,7 @@ export const addWeightLoss = async (req: Request, res: Response) => {
 
     const todayStock = todayBuyKg - todaySellKg - todayWeightLoss;
 
-    if (amount > todayStock) {
+    if (amount > todayStock+0.1) {
       console.log("Weight loss greater than today stock");
       res.status(400).json({ message: "Weight loss greater than today stock" });
       return;
