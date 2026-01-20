@@ -231,7 +231,6 @@ export const addWeightLoss = async (req: Request, res: Response) => {
     const transactions = await prisma.transaction.findMany({
       where: {
         driverId: userId,
-        date: { gte: start, lte: end },
       },
     });
 
