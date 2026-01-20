@@ -17,7 +17,7 @@ const transporter = nodemailer.createTransport({
 // Changed exports.sendEmail → export const sendEmail
 export const sendEmail = async (to: string, subject: string, text: string, html: string) => {
   await transporter.sendMail({
-    from: `"EVERGREEN FOODS" <${process.env.EMAIL_USER}>`,
+    from: `"EVERGREEN FOODS" <${process.env.OTP_MAIL}>`,
     to,
     subject,
     text,
