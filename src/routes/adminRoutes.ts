@@ -8,15 +8,14 @@ import { authenticate } from "../middleware/authMiddleware";
 // 1. Dashboard Stats
 export const getAdminDashboard = async (req: Request, res: Response) => {
   try {
-    const date = req.query.date as unknown as number;
+    const start = req.query.start as unknown as number;
+    const end = req.query.end as unknown as number;
     console.log(req.query)
-    console.log(date)
-    const today = date ? new Date(+date) : new Date();
-    const start = new Date(today.setHours(0, 0, 0, 0));
-    const end = new Date(today.setHours(23, 59, 59, 999));
-
+    console.log(start)
+    console.log(new Date(+start))
+    console.log(new Date(+end))
     const transactions = await prisma.transaction.findMany({
-      where: { date: { gte: start, lte: end } },
+      where: { date: { gte: new Date(+start), lte: new Date(+end) } },
     });
     // const allTransactions = await prisma.transaction.findMany();
 
@@ -97,6 +96,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
 
     res.json(stats);
   } catch (e) {
+    console.log(e)
     res.status(500).json({ error: "Failed" });
   }
 };
