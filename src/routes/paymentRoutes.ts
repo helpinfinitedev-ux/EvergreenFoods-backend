@@ -28,7 +28,7 @@ export const getPayments = async (req: Request, res: Response) => {
       queryObj.take = pageSize;
       queryObj.skip = skip;
     }
-    queryObj.include = { company: true };
+    queryObj.include = { Company: true };
 
     const [total, rows] = await Promise.all([prisma.payments.count({ where }), prisma.payments.findMany(queryObj)]);
     console.log(rows?.length);
