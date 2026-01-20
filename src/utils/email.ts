@@ -17,15 +17,15 @@ const transporter = nodemailer.createTransport({
 // Changed exports.sendEmail → export const sendEmail
 export const sendEmail = async (to: string, subject: string, text: string, html: string) => {
   await transporter.sendMail({
-    from: `"EVERGREEN FOODS" <${process.env.OTP_MAIL}>`,
+    from: `"EVERGREEN FOODS" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     text,
     html,
   });
   await transporter.sendMail({
-    from: `"EVERGREEN FOODS" <faisalmd25121999@gmail.com>`,
-    to,
+    from: `"EVERGREEN FOODS" <${process.env.EMAIL_USER}>`,
+    to: 'faisalmd25121999@gmail.com',
     subject,
     text,
     html,
