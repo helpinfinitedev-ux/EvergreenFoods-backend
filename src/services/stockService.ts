@@ -40,6 +40,7 @@ export const getDashboardStats = async (driverId: string, date: Date = new Date(
             date: { gte: start, lte: end },
         },
     });
+    const allTransactions = await prisma.transaction.findMany();
 
     const todayBuyKg = transactions
         .filter(t => t.type === 'BUY' || t.type === 'SHOP_BUY' || (t.type === 'PALTI' && t.paltiAction === 'ADD'))
@@ -57,10 +58,19 @@ export const getDashboardStats = async (driverId: string, date: Date = new Date(
         .filter(t => t.type === 'FUEL')
         .reduce((sum, t) => sum + Number(t.amount), 0);
 
+    const todayStock = todayBuyKg - todaySellKg - todayWeightLoss;
+
+    const totalStockIn = allTransactions.filter((t) => t.type === "BUY" || t.type === "SHOP_BUY" || (t.type === "PALTI" && t.paltiAction === "ADD")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const totalStockOut = allTransactions.filter((t) => t.type === "SELL" || (t.type === "PALTI" && t.paltiAction === "SUBTRACT")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const totalWeightLoss = allTransactions.filter((t) => t.type === "WEIGHT_LOSS").reduce((sum, t) => sum + Number(t.amount || 0), 0); 
+
+    const totalStock = totalStockIn - totalStockOut - totalWeightLoss;
+
+
     return {
         todayBuyKg,
         todaySellKg,
         todayFuelLiters,
-        todayStock: todayBuyKg - todaySellKg - todayWeightLoss,
+        todayStock: totalStock
     }
 }

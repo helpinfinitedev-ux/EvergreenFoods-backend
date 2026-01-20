@@ -8,15 +8,19 @@ import { authenticate } from "../middleware/authMiddleware";
 // 1. Dashboard Stats
 export const getAdminDashboard = async (req: Request, res: Response) => {
   try {
-    const today = new Date();
+    const date = req.query.date as unknown as number;
+    console.log(req.query)
+    console.log(date)
+    const today = date ? new Date(+date) : new Date();
     const start = new Date(today.setHours(0, 0, 0, 0));
     const end = new Date(today.setHours(23, 59, 59, 999));
 
     const transactions = await prisma.transaction.findMany({
       where: { date: { gte: start, lte: end } },
     });
-
     const allTransactions = await prisma.transaction.findMany();
+
+    // const allTransactions = await prisma.transaction.findMany();
     // const totalCashIn = allTransactions.filter((t) => t.type === "SELL" || t.type === "ADVANCE_PAYMENT").reduce((sum, t) => sum + Number(t.paymentCash || 0) + Number(t.paymentUpi || 0), 0);
     // const totalCashOut = allTransactions.reduce((sum, t) => sum + Number(t.totalAmount || 0), 0);
     const activeDrivers = await prisma.user.count({ where: { role: "DRIVER", status: "ACTIVE" } });
@@ -39,12 +43,12 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
     // Calculate total available stock from all drivers
     // Stock = Buy + Shop Buy + Palti(ADD) - Sell - Palti(SUBTRACT) - Weight Loss
     const totalStockIn = transactions.filter((t) => t.type === "BUY" || t.type === "SHOP_BUY" || (t.type === "PALTI" && t.paltiAction === "ADD")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
+    const totalStockInAll = allTransactions.filter((t) => t.type === "BUY" || t.type === "SHOP_BUY" || (t.type === "PALTI" && t.paltiAction === "ADD")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const totalStockOut = transactions.filter((t) => t.type === "SELL" || (t.type === "PALTI" && t.paltiAction === "SUBTRACT")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
+    const totalStockOutAll = allTransactions.filter((t) => t.type === "SELL" || (t.type === "PALTI" && t.paltiAction === "SUBTRACT")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const totalWeightLoss = transactions.filter((t) => t.type === "WEIGHT_LOSS").reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-    const totalAvailableStock = totalStockIn - totalStockOut - totalWeightLoss;
+    const totalWeightLossAll = allTransactions.filter((t) => t.type === "WEIGHT_LOSS").reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const totalAvailableStock = totalStockInAll - totalStockOutAll - totalWeightLossAll;
 
     const totalWeightLossPercentage = totalWeightLoss > 0 ? (totalWeightLoss / todayBuyQuantity) * 100 : 0;
 
