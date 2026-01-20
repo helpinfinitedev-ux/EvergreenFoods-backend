@@ -40,7 +40,9 @@ export const getDashboardStats = async (driverId: string, date: Date = new Date(
             date: { gte: start, lte: end },
         },
     });
-    const allTransactions = await prisma.transaction.findMany();
+    const allTransactions = await prisma.transaction.findMany({where:{
+        driverId
+    }});
 
     const todayBuyKg = transactions
         .filter(t => t.type === 'BUY' || t.type === 'SHOP_BUY' || (t.type === 'PALTI' && t.paltiAction === 'ADD'))
