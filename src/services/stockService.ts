@@ -7,11 +7,7 @@ export const getDriverStock = async (driverId: string, date: Date = new Date()) 
 
     const transactions = await prisma.transaction.findMany({
         where: {
-            driverId,
-            date: {
-                gte: start,
-                lte: end,
-            },
+            driverId
         },
     });
 
