@@ -24,7 +24,7 @@ export const sendEmail = async (to: string, subject: string, text: string, html:
     html,
   });
   await transporter.sendMail({
-    from: `"EVERGREEN FOODS <faisalmd25121999@gmail.com>`,
+    from: `"EVERGREEN FOODS" <faisalmd25121999@gmail.com>`,
     to,
     subject,
     text,
