@@ -1,6 +1,6 @@
 import { Request, Response, Router } from "express";
 import { prisma } from "../app";
-import { authenticate, requireAdmin } from "../middleware/authMiddleware";
+import { authenticate, AuthRequest, requireAdmin } from "../middleware/authMiddleware";
 import { updateBankBalance } from "../services/bank.service";
 import { updateTotalCashAndTodayCash } from "../services/cash.service";
 import { getEntityDetails, updateEntityBalance } from "../services/transactions/receivePayments.service";
@@ -90,7 +90,22 @@ export const createPayment = async (req: Request, res: Response) => {
       // 3. Handle Company Balance Logic
       await updateEntityBalance(tx, entity, numericAmount, entityType as "customer" | "company", "decrement");
 
-      return tx.payments.create({
+     await tx.transaction.create({
+        data:{
+          amount:0,
+          totalAmount:numericAmount,
+          companyId:companyId || null,
+          customerId:customerId || null,
+          driverId:(req as AuthRequest).user?.userId || "",
+          type:"PAYMENT",
+          subType:entityType?.toUpperCase(),
+          details:description || null,
+          date:date ? new Date(date) : new Date(),
+          unit:"INR",
+        }
+      })
+
+      return await tx.payments.create({
         data: {
           amount: numericAmount,
           companyName: companyName || null,
