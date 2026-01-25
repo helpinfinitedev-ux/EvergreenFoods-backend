@@ -64,6 +64,7 @@ export const createPayment = async (req: Request, res: Response) => {
         bankId?: string;
         companyId?: string;
         customerId?: string;
+        entityType?:string;
       };
 
     const numericAmount = Number(amount);
@@ -80,16 +81,14 @@ export const createPayment = async (req: Request, res: Response) => {
 
         await updateTotalCashAndTodayCash(tx, numericAmount, "decrement");
       }
-      if(!["customer","company"].includes(entityType)){
+      if(!entityType || !["customer","company"].includes(entityType as "customer" | "company")){
         throw new Error("INVALID_ENTITY_TYPE");
       }
-      const entity = await getEntityDetails(tx, customerId || companyId || "", entityType);
-      if (!entity) {
-        throw new Error("ENTITY_NOT_FOUND");
-      }
+      const entity = await getEntityDetails(tx, customerId || companyId || "", entityType as "customer" | "company");
+      if (!entity) throw new Error("ENTITY_NOT_FOUND");
 
       // 3. Handle Company Balance Logic
-     await updateEntityBalance(tx, entity,numericAmount,entityType,"decrement")
+      await updateEntityBalance(tx, entity, numericAmount, entityType as "customer" | "company", "decrement");
 
       return tx.payments.create({
         data: {
