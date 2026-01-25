@@ -4,6 +4,11 @@ import { AuthRequest } from "../middleware/authMiddleware";
 import { getDriverStock, getDashboardStats } from "../services/stockService";
 import { endOfDay, startOfDay } from "date-fns";
 import { uploadImageFromUri } from "../utils/firebase";
+import { updateTotalCashAndTodayCash } from "../services/cash.service";
+import { TRANSACTION_TYPE } from "../utils/constants";
+import { deleteSellTransaction } from "../services/transactions/index.service";
+import { getEntityDetails, updateEntityBalance } from "../services/transactions/receivePayments.service";
+import { Transaction } from "@prisma/client";
 
 // Dashboard Summary
 export const getDashboardSummary = async (req: Request, res: Response) => {
@@ -26,8 +31,12 @@ export const getRecentActivity = async (req: Request, res: Response) => {
 
     const transactions = await prisma.transaction.findMany({
       where: { driverId: userId },
+      include: {
+        company: true,
+        customer: true,
+      },
       orderBy: { date: "desc" },
-      take: 20,
+      take: 50,
     });
     res.json(transactions);
   } catch (e) {
@@ -41,33 +50,35 @@ export const addBuyEntry = async (req: Request, res: Response) => {
     const userId = (req as AuthRequest).user?.userId;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const { amount, rate, totalAmount, details, imageUrl, companyName } = req.body;
+    const { amount, type, entityType, rate, totalAmount, details, imageUrl, companyName, companyId, driverId, customerId } = req.body;
+    
+    const createdTxn = await prisma.$transaction(async (tx) => {
+      const entity = await getEntityDetails(tx, driverId || customerId || companyId || "", entityType);
 
-    const company = await prisma.company.findUnique({
-      where: { name: companyName },
+      if (!entity) {
+        throw new Error("ENTITY_NOT_FOUND");
+      }
+      
+      const txn = await tx.transaction.create({
+        data: {
+          driverId: driverId || userId,
+          companyName,
+          type: "BUY",
+          amount: amount,
+          unit: "KG",
+          rate: rate,
+          totalAmount: totalAmount,
+          details,
+          imageUrl,
+          companyId,
+          customerId
+        },
+      });
+      
+      return txn;
     });
 
-    if (!company) {
-      return res.status(404).json({ error: "Company not found" });
-    }
-
-    const companyId = company.id;
-
-    const tx = await prisma.transaction.create({
-      data: {
-        driverId: userId,
-        companyName,
-        type: "BUY",
-        amount: amount,
-        unit: "KG",
-        rate: rate,
-        totalAmount: totalAmount,
-        details,
-        imageUrl,
-        companyId,
-      },
-    });
-    res.json(tx);
+    res.json(createdTxn);
   } catch (e) {
     res.status(500).json({ error: "Failed to add entry" });
   }
@@ -79,7 +90,7 @@ export const addSellEntry = async (req: Request, res: Response) => {
     const userId = (req as AuthRequest).user?.userId;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const { amount, customerId, rate, totalAmount, paymentCash, paymentUpi, details } = req.body;
+    const { amount,entityType, customerId, companyId, driverId, rate, totalAmount, paymentCash, paymentUpi, details } = req.body;
 
     // 1. Check Stock
     const currentStock = await getDriverStock(userId);
@@ -92,17 +103,19 @@ export const addSellEntry = async (req: Request, res: Response) => {
     // We need to update Customer Balance + Create Transaction atomically
     const result = await prisma.$transaction(async (tx) => {
       // Create Sell Transaction
+      const entity = getEntityDetails(tx, customerId || companyId || driverId || "", entityType)
       const transaction = await tx.transaction.create({
         data: {
-          driverId: userId,
+          driverId: driverId || userId,
           type: "SELL",
-          amount,
+          amount: Number(amount || 0),
           unit: "KG",
-          rate,
-          totalAmount,
+          rate: Number(rate || 0),
+          totalAmount: Number(totalAmount || 0),
           paymentCash,
           paymentUpi,
           customerId,
+          companyId,
           details,
         },
       });
@@ -113,52 +126,7 @@ export const addSellEntry = async (req: Request, res: Response) => {
       const paid = Number(paymentCash || 0) + Number(paymentUpi || 0);
       const change = bill - paid;
 
-      await tx.customer.update({
-        where: { id: customerId },
-        data: {
-          balance: {
-            increment: change,
-          },
-        },
-      });
-
-      // Update totalCapital with paymentCash
-      const cashAmount = Number(paymentCash + paymentUpi || 0);
-      if (cashAmount > 0 && process.env.TOTAL_CASH_ID) {
-        // Fetch current totalCapital record
-        const capitalRecord = await tx.totalCapital.findUnique({
-          where: { id: process.env.TOTAL_CASH_ID },
-        });
-
-        if (capitalRecord) {
-          const now = new Date();
-          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-          // Check if cashLastUpdatedAt is from a previous day
-          let newTodayCash = cashAmount;
-          if (capitalRecord.cashLastUpdatedAt) {
-            const lastUpdated = new Date(capitalRecord.cashLastUpdatedAt);
-            const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
-
-            // If last updated is today, add to existing todayCash
-            if (lastUpdatedDay.getTime() === today.getTime()) {
-              newTodayCash = Number(capitalRecord.todayCash) + cashAmount;
-            }
-            // If last updated is before today, todayCash resets to just the new cashAmount
-          }
-
-          await tx.totalCapital.update({
-            where: { id: process.env.TOTAL_CASH_ID },
-            data: {
-              totalCash: {
-                increment: cashAmount,
-              },
-              todayCash: newTodayCash,
-              cashLastUpdatedAt: now,
-            },
-          });
-        }
-      }
+      await updateEntityBalance(tx, entity, change,entityType,"increment");
 
       return transaction;
     });
@@ -243,7 +211,7 @@ export const addWeightLoss = async (req: Request, res: Response) => {
 
     const todayStock = todayBuyKg - todaySellKg - todayWeightLoss;
 
-    if (amount > todayStock+0.1) {
+    if (amount > todayStock + 0.1) {
       console.log("Weight loss greater than today stock");
       res.status(400).json({ message: "Weight loss greater than today stock" });
       return;
@@ -307,5 +275,25 @@ export const addFuel = async (req: Request, res: Response) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Failed" });
+  }
+};
+
+export const deleteTransaction = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const transaction = await prisma.transaction.findUnique({ where: { id } });
+    if (!transaction) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+    if (transaction.type === TRANSACTION_TYPE.SELL) {
+      await deleteSellTransaction(transaction);
+    }
+    if (transaction.type === TRANSACTION_TYPE.BUY) {
+    }
+    await prisma.transaction.delete({ where: { id } });
+    res.json(transaction);
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ error: e?.message });
   }
 };

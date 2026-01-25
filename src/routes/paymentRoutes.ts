@@ -30,7 +30,10 @@ export const getPayments = async (req: Request, res: Response) => {
     }
     queryObj.include = { Company: true };
 
-    const [total, rows] = await Promise.all([prisma.payments.count({ where }), prisma.payments.findMany(queryObj)]);
+    const [total, rows] = await Promise.all([
+      prisma.payments.count({ where }),
+      prisma.payments.findMany(queryObj),
+    ]);
     console.log(rows?.length);
 
     res.json({
@@ -49,14 +52,15 @@ export const getPayments = async (req: Request, res: Response) => {
 // POST create a new payment
 export const createPayment = async (req: Request, res: Response) => {
   try {
-    const { amount, companyName, description, date, bankId, companyId } = req.body as {
-      amount: number;
-      companyName?: string;
-      description?: string;
-      date?: string;
-      bankId?: string;
-      companyId?: string;
-    };
+    const { amount, companyName, description, date, bankId, companyId } =
+      req.body as {
+        amount: number;
+        companyName?: string;
+        description?: string;
+        date?: string;
+        bankId?: string;
+        companyId?: string;
+      };
 
     const numericAmount = Number(amount);
     if (Number.isNaN(numericAmount) || numericAmount <= 0) {
@@ -85,7 +89,9 @@ export const createPayment = async (req: Request, res: Response) => {
         throw new Error("TOTAL_CASH_ID_NOT_SET");
       }
 
-      const capital = await tx.totalCapital.findUnique({ where: { id: totalCashId } });
+      const capital = await tx.totalCapital.findUnique({
+        where: { id: totalCashId },
+      });
       if (!capital) {
         throw new Error("TOTAL_CAPITAL_NOT_FOUND");
       }
@@ -96,7 +102,11 @@ export const createPayment = async (req: Request, res: Response) => {
 
       if (capital.cashLastUpdatedAt) {
         const lastUpdated = new Date(capital.cashLastUpdatedAt);
-        const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
+        const lastUpdatedDay = new Date(
+          lastUpdated.getFullYear(),
+          lastUpdated.getMonth(),
+          lastUpdated.getDate(),
+        );
         if (lastUpdatedDay.getTime() === today.getTime()) {
           const nextTodayCash = Number(capital.todayCash) - numericAmount;
           todayCashUpdate = Math.max(0, nextTodayCash);
@@ -119,7 +129,9 @@ export const createPayment = async (req: Request, res: Response) => {
 
       // 3. Handle Company Balance Logic
       if (companyId) {
-        const company = await tx.company.findUnique({ where: { id: companyId } });
+        const company = await tx.company.findUnique({
+          where: { id: companyId },
+        });
         if (!company) throw new Error("COMPANY_NOT_FOUND");
 
         // Payment REDUCES the amount due

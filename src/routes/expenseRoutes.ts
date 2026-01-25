@@ -57,9 +57,13 @@ export const getExpenseSummary = async (req: Request, res: Response) => {
 
     const expenses = await prisma.expense.findMany({ where });
 
-    const cashTotal = expenses.filter((e) => e.type === "CASH").reduce((sum, e) => sum + Number(e.amount), 0);
+    const cashTotal = expenses
+      .filter((e) => e.type === "CASH")
+      .reduce((sum, e) => sum + Number(e.amount), 0);
 
-    const bankTotal = expenses.filter((e) => e.type === "BANK").reduce((sum, e) => sum + Number(e.amount), 0);
+    const bankTotal = expenses
+      .filter((e) => e.type === "BANK")
+      .reduce((sum, e) => sum + Number(e.amount), 0);
 
     res.json({
       cashTotal,
@@ -86,7 +90,9 @@ export const createExpense = async (req: Request, res: Response) => {
     };
 
     if (!type || !amount || !description) {
-      return res.status(400).json({ error: "Type, amount, and description are required" });
+      return res
+        .status(400)
+        .json({ error: "Type, amount, and description are required" });
     }
 
     if (!["CASH", "BANK"].includes(type)) {
@@ -99,7 +105,9 @@ export const createExpense = async (req: Request, res: Response) => {
     }
 
     if (type === "BANK" && !bankId) {
-      return res.status(400).json({ error: "bankId is required for BANK expenses" });
+      return res
+        .status(400)
+        .json({ error: "bankId is required for BANK expenses" });
     }
 
     const created = await prisma.$transaction(async (tx) => {
@@ -124,18 +132,28 @@ export const createExpense = async (req: Request, res: Response) => {
           throw new Error("TOTAL_CASH_ID_NOT_SET");
         }
 
-        const capital = await tx.totalCapital.findUnique({ where: { id: totalCashId } });
+        const capital = await tx.totalCapital.findUnique({
+          where: { id: totalCashId },
+        });
         if (!capital) {
           throw new Error("TOTAL_CAPITAL_NOT_FOUND");
         }
 
         const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const today = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+        );
         let todayCashUpdate: number | undefined;
 
         if (capital.cashLastUpdatedAt) {
           const lastUpdated = new Date(capital.cashLastUpdatedAt);
-          const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
+          const lastUpdatedDay = new Date(
+            lastUpdated.getFullYear(),
+            lastUpdated.getMonth(),
+            lastUpdated.getDate(),
+          );
           if (lastUpdatedDay.getTime() === today.getTime()) {
             const nextTodayCash = Number(capital.todayCash) - numericAmount;
             todayCashUpdate = Math.max(0, nextTodayCash);

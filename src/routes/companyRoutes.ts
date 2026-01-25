@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/authMiddleware";
-import { addCompany, deleteCompany, getCompanies, updateCompany } from "../controllers/companyController";
+import {
+  addCompany,
+  deleteCompany,
+  getCompanies,
+  updateCompany,
+} from "../controllers/companyController";
 
 const router = Router();
 

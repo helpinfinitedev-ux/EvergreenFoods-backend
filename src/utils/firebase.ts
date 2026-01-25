@@ -1,5 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import {
+  getStorage,
+  ref,
+  uploadBytesResumable,
+  getDownloadURL,
+} from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAfKCo72Mh5L5a7QgozOkUjwdsr6-FR6jA",
@@ -24,7 +29,8 @@ export const uploadImage = (file: any) => {
       "state_changed",
       (snapshot) => {
         // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        const progress =
+          (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
         console.log("Upload is " + progress + "% done");
         switch (snapshot.state) {
           case "paused":
@@ -50,13 +56,16 @@ export const uploadImage = (file: any) => {
           .catch((error) => {
             reject(error); // Reject the Promise if there's an error getting the download URL
           });
-      }
+      },
     );
   });
 };
 
 // Upload image from React Native URI (Expo ImagePicker)
-export const uploadImageFromUri = async (uri: string, folder: string = "fuel-slips"): Promise<string> => {
+export const uploadImageFromUri = async (
+  uri: string,
+  folder: string = "fuel-slips",
+): Promise<string> => {
   try {
     // Fetch the image as blob
     const response = await fetch(uri);
@@ -73,7 +82,8 @@ export const uploadImageFromUri = async (uri: string, folder: string = "fuel-sli
       uploadTask.on(
         "state_changed",
         (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           console.log(`Upload is ${progress.toFixed(0)}% done`);
         },
         (error) => {
@@ -84,7 +94,7 @@ export const uploadImageFromUri = async (uri: string, folder: string = "fuel-sli
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
           console.log("File uploaded successfully:", downloadURL);
           resolve(downloadURL);
-        }
+        },
       );
     });
   } catch (error) {

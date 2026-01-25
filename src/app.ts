@@ -3,7 +3,45 @@ import cors from "cors";
 import { PrismaClient } from "@prisma/client";
 
 const app = express();
-export const prisma = new PrismaClient();
+const basePrisma = new PrismaClient();
+
+export const prisma = basePrisma.$extends({
+  query: {
+    transaction: {
+      async create({ args, query }) {
+        const result = await query(args);
+        console.log("Transaction created:", result.id);
+
+        // Update driver's updatedAt after transaction create
+        await basePrisma.user.update({
+          where: { id: result.driverId },
+          data: { updatedAt: new Date() },
+        });
+
+        return result;
+      },
+
+      async update({ args, query }) {
+        const result = await query(args);
+        console.log("Transaction updated:", result.id);
+
+        // Update driver's updatedAt after transaction update
+        await basePrisma.user.update({
+          where: { id: result.driverId },
+          data: { updatedAt: new Date() },
+        });
+
+        return result;
+      },
+
+      async delete({ args, query }) {
+        const result = await query(args);
+        console.log("Transaction deleted:", result.id);
+        return result;
+      },
+    },
+  },
+});
 
 import authRoutes from "./routes/authRoutes";
 import transactionRoutes from "./routes/transactionRoutes";

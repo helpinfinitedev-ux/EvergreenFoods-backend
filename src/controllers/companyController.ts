@@ -16,7 +16,10 @@ export const getCompanies = async (req: Request, res: Response) => {
       where.mobile = { contains: params.mobile as string, mode: "insensitive" };
     }
     if (params.address) {
-      where.address = { contains: params.address as string, mode: "insensitive" };
+      where.address = {
+        contains: params.address as string,
+        mode: "insensitive",
+      };
     }
     queryObj.where = where;
     queryObj.orderBy = { name: "asc" };
@@ -25,9 +28,18 @@ export const getCompanies = async (req: Request, res: Response) => {
       queryObj.skip = skip;
     }
     // queryObj.include = { company: true };
-    const [total, companies] = await Promise.all([prisma.company.count({ where }), prisma.company.findMany(queryObj)]);
+    const [total, companies] = await Promise.all([
+      prisma.company.count({ where }),
+      prisma.company.findMany(queryObj),
+    ]);
     // console.log(companies?.length);
-    res.json({ page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)), companies });
+    res.json({
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      companies,
+    });
   } catch (e) {
     res.status(500).json({ error: "Failed to get companies" });
   }
@@ -57,7 +69,12 @@ export const updateCompany = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { name, address, mobile, amountDue } = req.body;
-    const data: { name?: string; address?: string | null; mobile?: string | null; amountDue?: number } = {};
+    const data: {
+      name?: string;
+      address?: string | null;
+      mobile?: string | null;
+      amountDue?: number;
+    } = {};
 
     if (name !== undefined) data.name = name;
     if (address !== undefined) data.address = address || null;

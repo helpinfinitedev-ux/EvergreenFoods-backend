@@ -106,5 +106,3 @@ router.patch("/read-all", markAllAsRead);
 router.patch("/:id", updateNotification);
 
 export default router;
-
-

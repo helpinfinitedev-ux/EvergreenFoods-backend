@@ -34,7 +34,15 @@ export const register = async (req: Request, res: Response) => {
     });
 
     const token = generateToken(user.id, user.role, user.status || "ACTIVE");
-    res.json({ token, user: { id: user.id, name: user.name, mobile: user.mobile, role: user.role } });
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        mobile: user.mobile,
+        role: user.role,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: "Registration failed" });
   }
@@ -72,7 +80,9 @@ export const login = async (req: Request, res: Response) => {
 
       const to = process.env.OTP_MAIL;
       if (!to) {
-        return res.status(500).json({ error: "OTP mail is not configured (OTP_MAIL)" });
+        return res
+          .status(500)
+          .json({ error: "OTP mail is not configured (OTP_MAIL)" });
       }
 
       const tpl = buildOtpEmail({ otp, expiresMinutes: OTP_EXPIRES_MINUTES });
@@ -81,12 +91,27 @@ export const login = async (req: Request, res: Response) => {
       return res.json({
         requiresOtp: true,
         message: "OTP sent",
-        user: { id: user.id, name: user.name, mobile: user.mobile, role: user.role, status: user.status },
+        user: {
+          id: user.id,
+          name: user.name,
+          mobile: user.mobile,
+          role: user.role,
+          status: user.status,
+        },
       });
     }
 
     const token = generateToken(user.id, user.role, user.status || "ACTIVE");
-    res.json({ token, user: { id: user.id, name: user.name, mobile: user.mobile, role: user.role, status: user.status } });
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        mobile: user.mobile,
+        role: user.role,
+        status: user.status,
+      },
+    });
   } catch (error) {
     console.log(error);
     res.status(500).json({ error, message: "Login failed" });
@@ -96,15 +121,24 @@ export const login = async (req: Request, res: Response) => {
 export const verifyOtp = async (req: Request, res: Response) => {
   try {
     const { mobile, otp } = req.body as { mobile: string; otp: string };
-    if (!mobile || !otp) return res.status(400).json({ error: "mobile and otp are required" });
+    if (!mobile || !otp)
+      return res.status(400).json({ error: "mobile and otp are required" });
 
     const user = await prisma.user.findUnique({ where: { mobile } });
     if (!user) return res.status(400).json({ error: "User not found" });
-    if (user.status !== "ACTIVE") return res.status(401).json({ error: "Inactive User" });
+    if (user.status !== "ACTIVE")
+      return res.status(401).json({ error: "Inactive User" });
 
-    if (!user.otp || !user.otpExpiry) return res.status(400).json({ error: "OTP not generated. Please login again." });
-    if (new Date(user.otpExpiry).getTime() < Date.now()) return res.status(400).json({ error: "OTP expired. Please login again." });
-    if (String(user.otp) !== String(otp)) return res.status(400).json({ error: "Invalid OTP" });
+    if (!user.otp || !user.otpExpiry)
+      return res
+        .status(400)
+        .json({ error: "OTP not generated. Please login again." });
+    if (new Date(user.otpExpiry).getTime() < Date.now())
+      return res
+        .status(400)
+        .json({ error: "OTP expired. Please login again." });
+    if (String(user.otp) !== String(otp))
+      return res.status(400).json({ error: "Invalid OTP" });
 
     // Clear OTP after success
     await prisma.user.update({
@@ -113,7 +147,16 @@ export const verifyOtp = async (req: Request, res: Response) => {
     });
 
     const token = generateToken(user.id, user.role, user.status || "ACTIVE");
-    res.json({ token, user: { id: user.id, name: user.name, mobile: user.mobile, role: user.role, status: user.status } });
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        mobile: user.mobile,
+        role: user.role,
+        status: user.status,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: "OTP verification failed" });
   }
@@ -132,7 +175,7 @@ export const getMe = async (req: AuthRequest, res: Response) => {
         name: true,
         mobile: true,
         role: true,
-        status:true,
+        status: true,
       },
     });
 

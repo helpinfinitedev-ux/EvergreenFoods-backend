@@ -2,120 +2,16 @@ import { Request, Response, Router } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../app";
 import { authenticate } from "../middleware/authMiddleware";
+import { updateTotalCashAndTodayCash } from "../services/cash.service";
+import { getAdminDashboard } from "./admin/dashboard";
+import { createDriver, deleteDriver, generateTodaysReport, getDrivers, updateDriver, updateDriverStatus } from "./admin/driver";
+import { getEntityDetails, updateEntityBalance } from "../services/transactions/receivePayments.service";
+import { updateBankBalance } from "../services/bank.service";
+import { Transaction } from "@prisma/client";
 
 // --- Controllers ---
 
-// 1. Dashboard Stats
-export const getAdminDashboard = async (req: Request, res: Response) => {
-  try {
-    const start = req.query.start as unknown as number;
-    const end = req.query.end as unknown as number;
-    console.log(req.query)
-    console.log(start)
-    console.log(new Date(+start))
-    console.log(new Date(+end))
-    const transactions = await prisma.transaction.findMany({
-      where: { date: { gte: new Date(+start), lte: new Date(+end) } },
-    });
-    // const allTransactions = await prisma.transaction.findMany();
-
-    // const allTransactions = await prisma.transaction.findMany();
-    // const totalCashIn = allTransactions.filter((t) => t.type === "SELL" || t.type === "ADVANCE_PAYMENT").reduce((sum, t) => sum + Number(t.paymentCash || 0) + Number(t.paymentUpi || 0), 0);
-    // const totalCashOut = allTransactions.reduce((sum, t) => sum + Number(t.totalAmount || 0), 0);
-    const activeDrivers = await prisma.user.count({ where: { role: "DRIVER", status: "ACTIVE" } });
-
-    // Calculate payment received today from SELL transactions
-    const sellTransactions = transactions.filter((t) => t.type === "SELL");
-    const todayPaymentReceived = sellTransactions.reduce((sum, t) => sum + Number(t.paymentCash || 0) + Number(t.paymentUpi || 0), 0);
-
-    // Calculate BUY stats
-    const buyTransactions = transactions.filter((t) => t.type === "BUY");
-    const todayBuyQuantity = buyTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const todayBuyTotalAmount = buyTransactions.reduce((sum, t) => sum + Number(t.totalAmount || 0), 0);
-    const todayBuyAvgRate = todayBuyQuantity > 0 ? todayBuyTotalAmount / todayBuyQuantity : 0;
-
-    // Calculate SELL stats
-    const todaySellQuantity = sellTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const todaySellTotalAmount = sellTransactions.reduce((sum, t) => sum + Number(t.totalAmount || 0), 0);
-    const todaySellAvgRate = todaySellQuantity > 0 ? todaySellTotalAmount / todaySellQuantity : 0;
-
-    // Calculate total available stock from all drivers
-    // Stock = Buy + Shop Buy + Palti(ADD) - Sell - Palti(SUBTRACT) - Weight Loss
-    const totalStockIn = transactions.filter((t) => t.type === "BUY" || t.type === "SHOP_BUY" || (t.type === "PALTI" && t.paltiAction === "ADD")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    // const totalStockInAll = allTransactions.filter((t) => t.type === "BUY" || t.type === "SHOP_BUY" || (t.type === "PALTI" && t.paltiAction === "ADD")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const totalStockOut = transactions.filter((t) => t.type === "SELL" || (t.type === "PALTI" && t.paltiAction === "SUBTRACT")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    // const totalStockOutAll = allTransactions.filter((t) => t.type === "SELL" || (t.type === "PALTI" && t.paltiAction === "SUBTRACT")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const totalWeightLoss = transactions.filter((t) => t.type === "WEIGHT_LOSS").reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    // const totalWeightLossAll = allTransactions.filter((t) => t.type === "WEIGHT_LOSS").reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const totalAvailableStock = totalStockIn - totalStockOut - totalWeightLoss;
-
-    const totalWeightLossPercentage = totalWeightLoss > 0 ? (totalWeightLoss / todayBuyQuantity) * 100 : 0;
-
-    // Calculate today's profit/loss (Sell - Buy)
-    const todayProfit = todaySellTotalAmount - todayBuyTotalAmount;
-    // const totalCash
-
-    const banks = await prisma.bank.findMany({
-      orderBy: { name: "asc" },
-    });
-    const totalBankBalance = banks.reduce((sum, bank) => sum + Number(bank.balance || 0), 0);
-    const totalInMarket = await prisma.customer.aggregate({
-      _sum: { balance: true },
-    });
-    const totalCompanyDue = await prisma.company.aggregate({
-      _sum: { amountDue: true },
-    });
-
-    console.log(totalInMarket);
-
-    const stats = {
-      todayBuy: todayBuyQuantity,
-      todayBuyTotalAmount,
-      todayBuyAvgRate,
-      todaySell: todaySellQuantity,
-      todaySellTotalAmount,
-      todaySellAvgRate,
-      todayShopBuy: transactions.filter((t) => t.type === "SHOP_BUY").reduce((sum, t) => sum + Number(t.amount || 0), 0),
-      todayFuel: transactions.filter((t) => t.type === "FUEL").length,
-      todayWeightLoss: totalWeightLoss,
-      todayPaymentReceived,
-      activeDrivers,
-      totalAvailableStock,
-      totalWeightLossPercentage,
-      todayProfit,
-      banks: banks.map((b) => ({
-        id: b.id,
-        name: b.name,
-        label: b.label,
-        balance: Number(b.balance || 0),
-      })),
-      totalBankBalance,
-      totalInMarket: Number(totalInMarket._sum?.balance || 0),
-      totalCompanyDue: Number(totalCompanyDue._sum?.amountDue || 0),
-    };
-
-    res.json(stats);
-  } catch (e) {
-    console.log(e)
-    res.status(500).json({ error: "Failed" });
-  }
-};
-
 // 2. Driver Management
-export const getDrivers = async (req: Request, res: Response) => {
-  const drivers = await prisma.user.findMany({
-    where: { role: "DRIVER" },
-    orderBy: { name: "asc" },
-  });
-  res.json(drivers);
-};
-
-export const updateDriverStatus = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { status } = req.body; // ACTIVE / BLOCKED
-  await prisma.user.update({ where: { id }, data: { status } });
-  res.json({ success: true });
-};
 
 // 2A. Admin Borrowed Money
 export const getBorrowedInfo = async (req: Request, res: Response) => {
@@ -232,123 +128,13 @@ export const deleteBorrowedInfo = async (req: Request, res: Response) => {
   }
 };
 
-export const updateDriver = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { password, baseSalary } = req.body as { password?: string; baseSalary?: number };
-
-    const driver = await prisma.user.findUnique({ where: { id } });
-    if (!driver || driver.role !== "DRIVER") {
-      return res.status(404).json({ error: "Driver not found" });
-    }
-
-    const data: any = {};
-
-    if (password !== undefined) {
-      const pwd = String(password);
-      if (pwd.trim().length < 4) return res.status(400).json({ error: "Password must be at least 4 characters" });
-      data.passwordHash = await bcrypt.hash(pwd, 10);
-    }
-
-    if (baseSalary !== undefined) {
-      const salaryNum = Number(baseSalary);
-      if (Number.isNaN(salaryNum) || salaryNum < 0) return res.status(400).json({ error: "Invalid baseSalary" });
-      data.baseSalary = salaryNum;
-    }
-
-    if (Object.keys(data).length === 0) {
-      return res.status(400).json({ error: "Nothing to update" });
-    }
-
-    const updated = await prisma.user.update({
-      where: { id },
-      data,
-    });
-
-    res.json({
-      success: true,
-      driver: {
-        id: updated.id,
-        name: updated.name,
-        mobile: updated.mobile,
-        role: updated.role,
-        status: updated.status,
-        baseSalary: updated.baseSalary,
-      },
-    });
-  } catch (error) {
-    console.error("Update driver error:", error);
-    res.status(500).json({ error: "Failed to update driver" });
-  }
-};
-
-export const deleteDriver = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const driver = await prisma.user.findUnique({ where: { id } });
-    if (!driver || driver.role !== "DRIVER") {
-      return res.status(404).json({ error: "Driver not found" });
-    }
-
-    const txCount = await prisma.transaction.count({ where: { driverId: id } });
-    if (txCount > 0) {
-      return res.status(400).json({ error: "Cannot delete driver with existing transactions" });
-    }
-
-    await prisma.user.delete({ where: { id } });
-    res.json({ success: true });
-  } catch (error) {
-    console.error("Delete driver error:", error);
-    res.status(500).json({ error: "Failed to delete driver" });
-  }
-};
-
-export const createDriver = async (req: Request, res: Response) => {
-  try {
-    const { name, mobile, password, baseSalary } = req.body;
-
-    const existingUser = await prisma.user.findUnique({ where: { mobile } });
-    if (existingUser) {
-      return res.status(400).json({ error: "Mobile number already registered" });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const driver = await prisma.user.create({
-      data: {
-        name,
-        mobile,
-        passwordHash,
-        role: "DRIVER",
-        baseSalary: baseSalary ? Number(baseSalary) : 0,
-      },
-    });
-
-    res.json({
-      success: true,
-      driver: {
-        id: driver.id,
-        name: driver.name,
-        mobile: driver.mobile,
-        role: driver.role,
-        status: driver.status,
-        baseSalary: driver.baseSalary,
-      },
-    });
-  } catch (error) {
-    console.error("Create driver error:", error);
-    res.status(500).json({ error: "Failed to create driver" });
-  }
-};
-
 // 2B. Customer Payments Received
 export const getCustomersWithDue = async (req: Request, res: Response) => {
   try {
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
 
-    const where: any = { balance: { gt: 0 } };
+    const where: Record<string, any> = {};
     if (startDate || endDate) {
       where.updatedAt = {};
       if (startDate) {
@@ -377,12 +163,21 @@ export const getCustomersWithDue = async (req: Request, res: Response) => {
 
 export const receiveCustomerPayment = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const { amount, method, bankId } = req.body as {
+    const { driverId, customerId, companyId, amount, method, bankId } = req.body as {
+      driverId?: string;
+      customerId?: string;
+      companyId?: string;
       amount: number;
       method: "CASH" | "BANK";
       bankId?: string;
     };
+
+    let updatedTransaction: Transaction;
+
+    const type = driverId ? "driver" : customerId ? "customer" : companyId ? "company" : undefined;
+    if (!type) {
+      return res.status(400).json({ error: "Invalid entity type" });
+    }
 
     const numericAmount = Number(amount);
     if (Number.isNaN(numericAmount) || numericAmount <= 0) {
@@ -396,77 +191,34 @@ export const receiveCustomerPayment = async (req: Request, res: Response) => {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const customer = await tx.customer.findUnique({ where: { id } });
-      if (!customer) {
-        throw new Error("CUSTOMER_NOT_FOUND");
+      const entity = await getEntityDetails(tx, driverId || customerId || companyId || "", type);
+      if (!entity) {
+        throw new Error("ENTITY_NOT_FOUND");
       }
 
       if (method === "BANK") {
-        const bank = await tx.bank.findUnique({ where: { id: bankId } });
-        if (!bank) {
-          throw new Error("BANK_NOT_FOUND");
-        }
-        await tx.bank.update({
-          where: { id: bankId },
-          data: { balance: { increment: numericAmount } },
-        });
+        await updateBankBalance(tx, bankId || "", numericAmount, "increment");
       }
 
       if (method === "CASH") {
-        const totalCashId = process.env.TOTAL_CASH_ID;
-        if (!totalCashId) {
-          throw new Error("TOTAL_CASH_ID_NOT_SET");
-        }
-
-        const capital = await tx.totalCapital.findUnique({ where: { id: totalCashId } });
-        if (!capital) {
-          throw new Error("TOTAL_CAPITAL_NOT_FOUND");
-        }
-
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        let todayCashUpdate: number;
-        if (capital.cashLastUpdatedAt) {
-          const lastUpdated = new Date(capital.cashLastUpdatedAt);
-          const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
-          if (lastUpdatedDay.getTime() === today.getTime()) {
-            todayCashUpdate = Number(capital.todayCash) + numericAmount;
-          } else {
-            todayCashUpdate = numericAmount;
-          }
-        } else {
-          todayCashUpdate = numericAmount;
-        }
-
-        await tx.totalCapital.update({
-          where: { id: totalCashId },
-          data: {
-            totalCash: { increment: numericAmount },
-            todayCash: todayCashUpdate,
-            cashLastUpdatedAt: now,
-          },
-        });
+        await updateTotalCashAndTodayCash(tx, numericAmount, "increment");
       }
 
-      const newBalance = Math.max(0, Number(customer.balance) - numericAmount);
-      const updatedCustomer = await tx.customer.update({
-        where: { id },
-        data: { balance: newBalance },
-      });
-      const updatedTransaction = await tx.transaction.create({
+      await updateEntityBalance(tx, entity, numericAmount, type);
+
+      updatedTransaction = await tx.transaction.create({
         data: {
           type: "RECEIVE_PAYMENT",
-          amount: 0,
+          subType: type.toUpperCase(),
+          amount: numericAmount,
           totalAmount: numericAmount,
-          customerId: id,
+          customerId,
+          companyId,
+          driverId: driverId || (req as any).user?.userId,
           unit: "INR",
-          driverId: (req as any).user.userId,
         },
       });
-
-      return updatedCustomer;
     });
-
     res.json({ success: true, customer: result });
   } catch (error: any) {
     if (error?.message === "CUSTOMER_NOT_FOUND") {
@@ -583,7 +335,12 @@ export const getCashToBank = async (req: Request, res: Response) => {
 
 export const createCashToBank = async (req: Request, res: Response) => {
   try {
-    const { bankName, amount, date, bankId } = req.body as { bankName: string; amount: number; date?: string; bankId: string };
+    const { bankName, amount, date, bankId } = req.body as {
+      bankName: string;
+      amount: number;
+      date?: string;
+      bankId: string;
+    };
 
     if (!bankName || String(bankName).trim() === "") return res.status(400).json({ error: "bankName is required" });
     const numericAmount = Number(amount);
@@ -603,39 +360,7 @@ export const createCashToBank = async (req: Request, res: Response) => {
         },
       });
 
-      if (process.env.TOTAL_CASH_ID) {
-        const capitalRecord = await tx.totalCapital.findUnique({
-          where: { id: process.env.TOTAL_CASH_ID },
-        });
-
-        if (capitalRecord) {
-          const now = new Date();
-          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          let todayCashUpdate: number | undefined;
-
-          if (capitalRecord.cashLastUpdatedAt) {
-            const lastUpdated = new Date(capitalRecord.cashLastUpdatedAt);
-            const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
-            if (lastUpdatedDay.getTime() === today.getTime()) {
-              todayCashUpdate = Number(capitalRecord.todayCash) - numericAmount;
-            }
-          }
-          if (+capitalRecord?.totalCash - numericAmount < 0) {
-            return res.status(400).json({ error: "Total cash is not enough" });
-          }
-          const data: any = {
-            totalCash: { decrement: numericAmount },
-          };
-          if (todayCashUpdate !== undefined) {
-            data.todayCash = todayCashUpdate;
-          }
-
-          await tx.totalCapital.update({
-            where: { id: process.env.TOTAL_CASH_ID },
-            data,
-          });
-        }
-      }
+      await updateTotalCashAndTodayCash(tx, numericAmount, "decrement");
       if (bankId) {
         const bank = await tx.bank.findUnique({ where: { id: bankId } });
         if (bank) {
@@ -662,7 +387,11 @@ export const createCashToBank = async (req: Request, res: Response) => {
 export const updateCashToBank = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { bankName, amount, bankId } = req.body as { bankName?: string; amount?: number; bankId?: string };
+    const { bankName, amount, bankId } = req.body as {
+      bankName?: string;
+      amount?: number;
+      bankId?: string;
+    };
 
     const existing = await prisma.cashToBank.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: "CashToBank entry not found" });
@@ -699,53 +428,8 @@ export const updateCashToBank = async (req: Request, res: Response) => {
         where: { id },
         data,
       });
-
+      await updateTotalCashAndTodayCash(tx, Math.abs(amountDifference), amountDifference > 0 ? "decrement" : "increment");
       // Handle totalCash and todayCash adjustments if amount changed
-      if (amountDifference !== 0 && process.env.TOTAL_CASH_ID) {
-        const capitalRecord = await tx.totalCapital.findUnique({
-          where: { id: process.env.TOTAL_CASH_ID },
-        });
-
-        if (capitalRecord) {
-          // If amount increased, we need to decrement more from totalCash
-          // If amount decreased, we need to increment totalCash (add back the difference)
-          const now = new Date();
-          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          let todayCashUpdate: number | undefined;
-
-          if (capitalRecord.cashLastUpdatedAt) {
-            const lastUpdated = new Date(capitalRecord.cashLastUpdatedAt);
-            const lastUpdatedDay = new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate());
-            if (lastUpdatedDay.getTime() === today.getTime()) {
-              // Adjust todayCash by the difference
-              todayCashUpdate = Number(capitalRecord.todayCash) - amountDifference;
-            }
-          }
-
-          // Check if we have enough cash for an increase
-          if (amountDifference > 0 && Number(capitalRecord.totalCash) - amountDifference < 0) {
-            throw new Error("INSUFFICIENT_CASH");
-          }
-
-          const capitalData: any = {};
-          if (amountDifference > 0) {
-            capitalData.totalCash = { decrement: amountDifference };
-          } else if (amountDifference < 0) {
-            capitalData.totalCash = { increment: Math.abs(amountDifference) };
-          }
-
-          if (todayCashUpdate !== undefined) {
-            capitalData.todayCash = Math.max(0, todayCashUpdate);
-          }
-
-          if (Object.keys(capitalData).length > 0) {
-            await tx.totalCapital.update({
-              where: { id: process.env.TOTAL_CASH_ID },
-              data: capitalData,
-            });
-          }
-        }
-      }
 
       // Handle bank balance adjustments
       // If bank changed, remove from old bank and add to new bank
@@ -886,7 +570,10 @@ export const getVehicleById = async (req: Request, res: Response) => {
     const { id } = req.params;
     const vehicle = await prisma.vehicle.findUnique({
       where: { id },
-      include: { drivers: true, transactions: { take: 10, orderBy: { date: "desc" } } },
+      include: {
+        drivers: true,
+        transactions: { take: 10, orderBy: { date: "desc" } },
+      },
     });
 
     if (!vehicle) {
@@ -947,39 +634,39 @@ export const updateVehicle = async (req: Request, res: Response) => {
 export const updateTransaction = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { amount, rate, totalAmount, details, companyId } = req.body;
+    const { amount, rate, totalAmount, details, companyId,customerId,driverId,type,entityType } = req.body;
 
     const transaction = await prisma.transaction.findUnique({ where: { id } });
     if (!transaction) {
       return res.status(404).json({ error: "Transaction not found" });
     }
 
-    const updated = await prisma.transaction.update({
-      where: { id },
-      data: {
-        amount: amount !== undefined ? Number(amount) : transaction.amount,
-        rate: rate !== undefined ? Number(rate) : transaction.rate,
-        totalAmount: totalAmount !== undefined ? Number(totalAmount) : transaction.totalAmount,
-        details: details !== undefined ? (String(details).trim() === "" ? null : String(details)) : transaction.details,
-      },
-      include: { driver: true, customer: true, vehicle: true },
-    });
-
-    const company = await prisma.company.findUnique({ where: { id: companyId } });
-    if (!company) {
-      return res.status(404).json({ error: "Company not found" });
-    }
-
-    const updatedCompany = await prisma.company.update({
-      where: { id: companyId },
-      data: {
-        amountDue: {
-          increment: Number(transaction.totalAmount),
+    const updatedTransaction =await prisma.$transaction(async(tx)=>{
+      const updated = await tx.transaction.update({
+        where: { id },
+        data: {
+          amount: amount !== undefined ? Number(amount) : transaction.amount,
+          rate: rate !== undefined ? Number(rate) : transaction.rate,
+          totalAmount: totalAmount !== undefined ? Number(totalAmount) : transaction.totalAmount,
+          details: details !== undefined ? (String(details).trim() === "" ? null : String(details)) : transaction.details,
         },
-      },
-    });
+        include: { driver: true, customer: true, vehicle: true },
+      });
+  
+      const entity = await getEntityDetails(tx, driverId || customerId || companyId || "", entityType);
+      if (!entity) {
+        throw new Error("ENTITY_NOT_FOUND");
+      }
+  
+      const amountDifference = Number(totalAmount) - Number(transaction.totalAmount);
+      await updateEntityBalance(tx,entity,amountDifference,entityType,"increment");
+      
+      return updated;
+    })
 
-    res.json({ success: true, transaction: updated, company: updatedCompany });
+    
+
+    res.json({ success: true, transaction: updatedTransaction });
   } catch (error) {
     console.error("Update transaction error:", error);
     res.status(500).json({ error: "Failed to update transaction" });
@@ -1024,7 +711,9 @@ export const deleteTransaction = async (req: Request, res: Response) => {
         const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         const isToday = transactionDay.getTime() === todayDay.getTime();
 
-        const capital = await tx.totalCapital.findUnique({ where: { id: totalCashId } });
+        const capital = await tx.totalCapital.findUnique({
+          where: { id: totalCashId },
+        });
         if (!capital) {
           throw new Error("TOTAL_CAPITAL_NOT_FOUND");
         }
@@ -1033,7 +722,12 @@ export const deleteTransaction = async (req: Request, res: Response) => {
           where: { id: totalCashId },
           data: {
             totalCash: { decrement: cashAmount },
-            ...(isToday ? { todayCash: { decrement: cashAmount }, cashLastUpdatedAt: new Date() } : {}),
+            ...(isToday
+              ? {
+                  todayCash: { decrement: cashAmount },
+                  cashLastUpdatedAt: new Date(),
+                }
+              : {}),
           },
         });
       }
@@ -1071,7 +765,9 @@ export const deleteVehicle = async (req: Request, res: Response) => {
     }
 
     // Check if vehicle has any transactions
-    const transactionCount = await prisma.transaction.count({ where: { vehicleId: id } });
+    const transactionCount = await prisma.transaction.count({
+      where: { vehicleId: id },
+    });
     if (transactionCount > 0) {
       return res.status(400).json({ error: "Cannot delete vehicle with existing transactions" });
     }
@@ -1120,7 +816,11 @@ export const getBankDetails = async (req: Request, res: Response) => {
 export const updateBank = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, label, balance } = req.body as { name?: string; label?: string; balance?: number };
+    const { name, label, balance } = req.body as {
+      name?: string;
+      label?: string;
+      balance?: number;
+    };
 
     const bank = await prisma.bank.findUnique({ where: { id } });
     if (!bank) {
@@ -1160,7 +860,11 @@ export const updateBank = async (req: Request, res: Response) => {
 // Bank to Bank Transfer
 export const bankToBank = async (req: Request, res: Response) => {
   try {
-    const { fromBankId, toBankId, amount } = req.body as { fromBankId: string; toBankId: string; amount: number };
+    const { fromBankId, toBankId, amount } = req.body as {
+      fromBankId: string;
+      toBankId: string;
+      amount: number;
+    };
 
     if (!fromBankId || !toBankId || !amount) {
       return res.status(400).json({ error: "fromBankId, toBankId, and amount are required" });
@@ -1253,18 +957,19 @@ export const getTotalCapital = async (req: Request, res: Response) => {
 const router = Router();
 router.use(authenticate); // Admin Middleware Check Needed ideally
 
+//dashboard
 router.get("/dashboard", getAdminDashboard);
+
+//drivers
 router.get("/drivers", getDrivers);
 router.post("/drivers", createDriver);
 router.put("/drivers/:id", updateDriver);
 router.delete("/drivers/:id", deleteDriver);
 router.put("/drivers/:id/status", updateDriverStatus);
-router.get("/borrowed-money", getBorrowedInfo);
-router.post("/borrowed-money", addBorrowedInfo);
-router.put("/borrowed-money/:id", updateBorrowedInfo);
-router.delete("/borrowed-money/:id", deleteBorrowedInfo);
+router.get("/drivers/:id/report", generateTodaysReport);
+
 router.get("/customers/due", getCustomersWithDue);
-router.post("/customers/:id/receive-payment", receiveCustomerPayment);
+router.post("/receive-payment", receiveCustomerPayment);
 router.post("/financial/note", createFinancialNote);
 router.get("/cash-to-bank", getCashToBank);
 router.post("/cash-to-bank", createCashToBank);
@@ -1289,5 +994,11 @@ router.post("/banks/transfer", bankToBank);
 
 // Total capital routes
 router.get("/total-capital", getTotalCapital);
+
+//borrowed info
+router.get("/borrowed-money", getBorrowedInfo);
+router.post("/borrowed-money", addBorrowedInfo);
+router.put("/borrowed-money/:id", updateBorrowedInfo);
+router.delete("/borrowed-money/:id", deleteBorrowedInfo);
 
 export default router;
