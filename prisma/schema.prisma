@@ -65,6 +65,7 @@ model User {
 
   // Relations
   transactions Transaction[]
+  payments Payments[]
   borrowedMoneyEntries BorrowedMoney[]
   vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
   vehicleId    String?
@@ -82,6 +83,7 @@ model Customer {
   updatedAt DateTime @updatedAt
 
   // Relations
+  payments Payments[]
   transactions Transaction[]
 
   @@map("customers")
@@ -220,6 +222,10 @@ model Payments {
   bankId String?
   Company Company? @relation(fields: [companyId], references: [id])
   companyId String?
+  customer Customer? @relation(fields: [customerId], references: [id])
+  customerId String?
+  driver User? @relation(fields: [driverId], references: [id])
+  driverId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
  

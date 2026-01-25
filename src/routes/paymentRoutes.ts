@@ -1,6 +1,9 @@
 import { Request, Response, Router } from "express";
 import { prisma } from "../app";
 import { authenticate, requireAdmin } from "../middleware/authMiddleware";
+import { updateBankBalance } from "../services/bank.service";
+import { updateTotalCashAndTodayCash } from "../services/cash.service";
+import { getEntityDetails, updateEntityBalance } from "../services/transactions/receivePayments.service";
 
 // GET all payments with optional filters
 export const getPayments = async (req: Request, res: Response) => {
@@ -52,7 +55,7 @@ export const getPayments = async (req: Request, res: Response) => {
 // POST create a new payment
 export const createPayment = async (req: Request, res: Response) => {
   try {
-    const { amount, companyName, description, date, bankId, companyId } =
+    const { amount, companyName, description, date, bankId, companyId, customerId, entityType } =
       req.body as {
         amount: number;
         companyName?: string;
@@ -60,6 +63,7 @@ export const createPayment = async (req: Request, res: Response) => {
         date?: string;
         bankId?: string;
         companyId?: string;
+        customerId?: string;
       };
 
     const numericAmount = Number(amount);
@@ -70,76 +74,22 @@ export const createPayment = async (req: Request, res: Response) => {
     const payment = await prisma.$transaction(async (tx) => {
       // 1. Handle Bank Logic
       if (bankId) {
-        const bank = await tx.bank.findUnique({ where: { id: bankId } });
-        if (!bank) {
-          throw new Error("BANK_NOT_FOUND");
-        }
-        if (Number(bank.balance || 0) - numericAmount < 0) {
-          throw new Error("BANK_INSUFFICIENT_FUNDS");
-        }
-        await tx.bank.update({
-          where: { id: bankId },
-          data: { balance: { decrement: numericAmount } },
-        });
+        updateBankBalance(tx,bankId,numericAmount,"decrement");
       }
+      else{
 
-      // 2. Handle Capital Logic
-      const totalCashId = process.env.TOTAL_CASH_ID;
-      if (!totalCashId) {
-        throw new Error("TOTAL_CASH_ID_NOT_SET");
+        await updateTotalCashAndTodayCash(tx, numericAmount, "decrement");
       }
-
-      const capital = await tx.totalCapital.findUnique({
-        where: { id: totalCashId },
-      });
-      if (!capital) {
-        throw new Error("TOTAL_CAPITAL_NOT_FOUND");
+      if(!["customer","company"].includes(entityType)){
+        throw new Error("INVALID_ENTITY_TYPE");
       }
-
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      let todayCashUpdate: number | undefined;
-
-      if (capital.cashLastUpdatedAt) {
-        const lastUpdated = new Date(capital.cashLastUpdatedAt);
-        const lastUpdatedDay = new Date(
-          lastUpdated.getFullYear(),
-          lastUpdated.getMonth(),
-          lastUpdated.getDate(),
-        );
-        if (lastUpdatedDay.getTime() === today.getTime()) {
-          const nextTodayCash = Number(capital.todayCash) - numericAmount;
-          todayCashUpdate = Math.max(0, nextTodayCash);
-        } else if (lastUpdatedDay.getTime() < today.getTime()) {
-          todayCashUpdate = 0;
-        }
+      const entity = await getEntityDetails(tx, customerId || companyId || "", entityType);
+      if (!entity) {
+        throw new Error("ENTITY_NOT_FOUND");
       }
-
-      const capitalData: any = {
-        totalCash: { decrement: numericAmount },
-      };
-      if (todayCashUpdate !== undefined) {
-        capitalData.todayCash = todayCashUpdate;
-      }
-
-      await tx.totalCapital.update({
-        where: { id: totalCashId },
-        data: capitalData,
-      });
 
       // 3. Handle Company Balance Logic
-      if (companyId) {
-        const company = await tx.company.findUnique({
-          where: { id: companyId },
-        });
-        if (!company) throw new Error("COMPANY_NOT_FOUND");
-
-        // Payment REDUCES the amount due
-        await tx.company.update({
-          where: { id: companyId },
-          data: { amountDue: { decrement: numericAmount } },
-        });
-      }
+     await updateEntityBalance(tx, entity,numericAmount,entityType,"decrement")
 
       return tx.payments.create({
         data: {
@@ -149,6 +99,7 @@ export const createPayment = async (req: Request, res: Response) => {
           date: date ? new Date(date) : new Date(),
           bankId: bankId || null,
           companyId: companyId || null,
+          customerId: customerId || null,
         },
       });
     });

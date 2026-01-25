@@ -1,6 +1,10 @@
 import { PrismaTransaction } from "../../utils/types";
 
 export const getEntityDetails = async (tx: PrismaTransaction, id: string, type: "customer" | "company" | "driver") => {
+
+    if(!["customer","company", "driver"].includes(type)){
+        throw new Error("INVALID_ENTITY_TYPE");
+      }
   let entity: any;
   if (!id) throw new Error("NO ID Given");
   if (type === "customer") {
