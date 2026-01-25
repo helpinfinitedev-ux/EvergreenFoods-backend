@@ -32,6 +32,7 @@ export const getPayments = async (req: Request, res: Response) => {
       queryObj.skip = skip;
     }
     queryObj.include = { Company: true };
+    queryObj.include = {customer:true}
 
     const [total, rows] = await Promise.all([
       prisma.payments.count({ where }),
@@ -75,7 +76,7 @@ export const createPayment = async (req: Request, res: Response) => {
     const payment = await prisma.$transaction(async (tx) => {
       // 1. Handle Bank Logic
       if (bankId) {
-        updateBankBalance(tx,bankId,numericAmount,"decrement");
+        await updateBankBalance(tx,bankId,numericAmount,"decrement");
       }
       else{
 
@@ -105,7 +106,7 @@ export const createPayment = async (req: Request, res: Response) => {
         }
       })
 
-      return await tx.payments.create({
+      return  tx.payments.create({
         data: {
           amount: numericAmount,
           companyName: companyName || null,
@@ -116,6 +117,9 @@ export const createPayment = async (req: Request, res: Response) => {
           customerId: customerId || null,
         },
       });
+    },{
+      timeout: 60_000, // 60 seconds
+    maxWait: 10_000, // wait for a connection
     });
 
     res.status(201).json(payment);
