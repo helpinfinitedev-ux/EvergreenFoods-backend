@@ -66,7 +66,7 @@ export const addBuyEntry = async (req: Request, res: Response) => {
           type: "BUY",
           amount: amount,
           unit: "KG",
-          rate: rate,
+          rate: rate || 0,
           totalAmount: totalAmount,
           details,
           imageUrl,
@@ -80,6 +80,7 @@ export const addBuyEntry = async (req: Request, res: Response) => {
 
     res.json(createdTxn);
   } catch (e) {
+    console.log(e)
     res.status(500).json({ error: "Failed to add entry" });
   }
 };
@@ -103,7 +104,8 @@ export const addSellEntry = async (req: Request, res: Response) => {
     // We need to update Customer Balance + Create Transaction atomically
     const result = await prisma.$transaction(async (tx) => {
       // Create Sell Transaction
-      const entity = getEntityDetails(tx, customerId || companyId || driverId || "", entityType)
+      const entity =await getEntityDetails(tx, customerId || companyId || driverId || userId, entityType)
+      console.log(entity)
       const transaction = await tx.transaction.create({
         data: {
           driverId: driverId || userId,

@@ -1,6 +1,8 @@
 import { Request, Response, Router } from "express";
 import { prisma } from "../app";
 import { authenticate, requireAdmin } from "../middleware/authMiddleware";
+import { updateTotalCashAndTodayCash } from "../services/cash.service";
+import { updateBankBalance } from "../services/bank.service";
 
 // GET all expenses with optional filters
 export const getExpenses = async (req: Request, res: Response) => {
@@ -30,6 +32,14 @@ export const getExpenses = async (req: Request, res: Response) => {
     const expenses = await prisma.expense.findMany({
       where,
       orderBy: { date: "desc" },
+      include:{
+        driver:{
+          select:{
+            name:true,
+            id:true
+          }
+        },
+      },
     });
 
     res.json(expenses);
@@ -57,13 +67,9 @@ export const getExpenseSummary = async (req: Request, res: Response) => {
 
     const expenses = await prisma.expense.findMany({ where });
 
-    const cashTotal = expenses
-      .filter((e) => e.type === "CASH")
-      .reduce((sum, e) => sum + Number(e.amount), 0);
+    const cashTotal = expenses.filter((e) => e.type === "CASH").reduce((sum, e) => sum + Number(e.amount), 0);
 
-    const bankTotal = expenses
-      .filter((e) => e.type === "BANK")
-      .reduce((sum, e) => sum + Number(e.amount), 0);
+    const bankTotal = expenses.filter((e) => e.type === "BANK").reduce((sum, e) => sum + Number(e.amount), 0);
 
     res.json({
       cashTotal,
@@ -80,19 +86,18 @@ export const getExpenseSummary = async (req: Request, res: Response) => {
 // POST create a new expense
 export const createExpense = async (req: Request, res: Response) => {
   try {
-    const { type, amount, description, category, date, bankId } = req.body as {
+    const { type, amount, description, category, date, bankId, driverId } = req.body as {
       type: "CASH" | "BANK";
       amount: number;
       description: string;
       category?: string;
       date?: string;
       bankId?: string;
+      driverId?: string;
     };
 
     if (!type || !amount || !description) {
-      return res
-        .status(400)
-        .json({ error: "Type, amount, and description are required" });
+      return res.status(400).json({ error: "Type, amount, and description are required" });
     }
 
     if (!["CASH", "BANK"].includes(type)) {
@@ -105,79 +110,30 @@ export const createExpense = async (req: Request, res: Response) => {
     }
 
     if (type === "BANK" && !bankId) {
-      return res
-        .status(400)
-        .json({ error: "bankId is required for BANK expenses" });
+      return res.status(400).json({ error: "bankId is required for BANK expenses" });
     }
 
     const created = await prisma.$transaction(async (tx) => {
       if (type === "BANK") {
-        const bank = await tx.bank.findUnique({ where: { id: bankId } });
-        if (!bank) {
-          throw new Error("BANK_NOT_FOUND");
-        }
-        if (Number(bank.balance || 0) - numericAmount < 0) {
-          throw new Error("BANK_INSUFFICIENT_FUNDS");
-        }
-
-        await tx.bank.update({
-          where: { id: bankId },
-          data: { balance: { decrement: numericAmount } },
-        });
+        await updateBankBalance(tx, bankId || "", numericAmount, "decrement");
       }
 
       if (type === "CASH") {
-        const totalCashId = process.env.TOTAL_CASH_ID;
-        if (!totalCashId) {
-          throw new Error("TOTAL_CASH_ID_NOT_SET");
-        }
-
-        const capital = await tx.totalCapital.findUnique({
-          where: { id: totalCashId },
-        });
-        if (!capital) {
-          throw new Error("TOTAL_CAPITAL_NOT_FOUND");
-        }
-
-        const now = new Date();
-        const today = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate(),
-        );
-        let todayCashUpdate: number | undefined;
-
-        if (capital.cashLastUpdatedAt) {
-          const lastUpdated = new Date(capital.cashLastUpdatedAt);
-          const lastUpdatedDay = new Date(
-            lastUpdated.getFullYear(),
-            lastUpdated.getMonth(),
-            lastUpdated.getDate(),
-          );
-          if (lastUpdatedDay.getTime() === today.getTime()) {
-            const nextTodayCash = Number(capital.todayCash) - numericAmount;
-            todayCashUpdate = Math.max(0, nextTodayCash);
-          } else if (lastUpdatedDay.getTime() < today.getTime()) {
-            todayCashUpdate = 0;
-          }
-        }
-
-        if (+capital?.totalCash - numericAmount < 0) {
-          return res.status(400).json({ error: "Total cash is not enough" });
-        }
-
-        const data: any = {
-          totalCash: { decrement: numericAmount },
-        };
-        if (todayCashUpdate !== undefined) {
-          data.todayCash = todayCashUpdate;
-        }
-
-        await tx.totalCapital.update({
-          where: { id: totalCashId },
-          data,
-        });
+        await updateTotalCashAndTodayCash(tx, numericAmount, "decrement");
       }
+
+      await tx.transaction.create({
+        data: {
+          amount: 0,
+          totalAmount: numericAmount,
+          driverId: driverId || "",
+          type: "EXPENSE",
+          subType: driverId ? "SALARY" : "",
+          details: description || null,
+          date: date ? new Date(date) : new Date(),
+          unit:"INR",
+        },
+      });
 
       return tx.expense.create({
         data: {
@@ -187,6 +143,7 @@ export const createExpense = async (req: Request, res: Response) => {
           category: category || null,
           date: date ? new Date(date) : new Date(),
           bankId: type === "BANK" ? bankId : null,
+          driverId: driverId || null,
         },
       });
     });

@@ -101,3 +101,23 @@ export const deleteCompany = async (req: Request, res: Response) => {
     res.status(400).json({ error: "Failed to delete company" });
   }
 };
+
+export const getCompanyHistory = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    // Last 30 days of history
+    const now = new Date();
+    const past = new Date(now.setDate(now.getDate() - 30));
+
+    const history = await prisma.transaction.findMany({
+      where: {
+        companyId: id,
+        date: { gte: past },
+      },
+      orderBy: { date: "desc" },
+    });
+    res.json(history);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to get company history" });
+  }
+};

@@ -4,10 +4,11 @@ import { prisma } from "../app";
 import { authenticate } from "../middleware/authMiddleware";
 import { updateTotalCashAndTodayCash } from "../services/cash.service";
 import { getAdminDashboard } from "./admin/dashboard";
-import { createDriver, deleteDriver, generateTodaysReport, getDrivers, updateDriver, updateDriverStatus } from "./admin/driver";
+import { createDriver, deleteDriver, generateTodaysReport, getAllDriversActivitySummary, getDrivers, updateDriver, updateDriverStatus } from "./admin/driver";
 import { getEntityDetails, updateEntityBalance } from "../services/transactions/receivePayments.service";
 import { updateBankBalance } from "../services/bank.service";
 import { Transaction } from "@prisma/client";
+import { getPaymentsReceived } from "./admin/payments";
 
 // --- Controllers ---
 
@@ -174,6 +175,8 @@ export const receiveCustomerPayment = async (req: Request, res: Response) => {
 
     let updatedTransaction: Transaction;
 
+    console.log(req.body);
+
     const type = driverId ? "driver" : customerId ? "customer" : companyId ? "company" : undefined;
     if (!type) {
       return res.status(400).json({ error: "Invalid entity type" });
@@ -212,6 +215,7 @@ export const receiveCustomerPayment = async (req: Request, res: Response) => {
           subType: type.toUpperCase(),
           amount: numericAmount,
           totalAmount: numericAmount,
+          details: `In ${method}`,
           customerId,
           companyId,
           driverId: driverId || (req as any).user?.userId,
@@ -967,9 +971,11 @@ router.put("/drivers/:id", updateDriver);
 router.delete("/drivers/:id", deleteDriver);
 router.put("/drivers/:id/status", updateDriverStatus);
 router.get("/drivers/:id/report", generateTodaysReport);
+router.get("/drivers/activity-summary", getAllDriversActivitySummary);
 
 router.get("/customers/due", getCustomersWithDue);
 router.post("/receive-payment", receiveCustomerPayment);
+router.get('/payments-received/:id', getPaymentsReceived)
 router.post("/financial/note", createFinancialNote);
 router.get("/cash-to-bank", getCashToBank);
 router.post("/cash-to-bank", createCashToBank);

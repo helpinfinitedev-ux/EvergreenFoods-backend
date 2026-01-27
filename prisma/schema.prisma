@@ -26,11 +26,12 @@ enum TransactionType {
   RECEIVE_PAYMENT
   PAYMENT
   PAYMENT_TO_COMPANY
-  PAYMENT_TO_BANK
+  PAYMENTNK
   PAYMENT_TO_EXPENSE
   PAYMENT_TO_OTHER
   CASH_TO_BANK
   BANK_TO_BANK
+  EXPENSE
 }
 
 enum VehicleStatus {
@@ -70,6 +71,7 @@ model User {
   borrowedMoneyEntries BorrowedMoney[]
   vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
   vehicleId    String?
+  expense Expense[]
 
   @@map("users")
 }
@@ -166,6 +168,8 @@ model Expense {
   date        DateTime    @default(now())
   bank        Bank?       @relation(fields: [bankId], references: [id])
   bankId      String?
+  driver      User?       @relation(fields: [driverId], references: [id])
+  driverId    String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
