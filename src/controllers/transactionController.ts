@@ -128,7 +128,7 @@ export const addSellEntry = async (req: Request, res: Response) => {
       const paid = Number(paymentCash || 0) + Number(paymentUpi || 0);
       const change = bill - paid;
 
-      await updateEntityBalance(tx, entity, change,entityType,"increment");
+      await updateEntityBalance(tx, entity, change,entityType,entityType === "customer" ? "increment" : "decrement");
 
       return transaction;
     });

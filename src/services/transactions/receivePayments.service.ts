@@ -25,7 +25,7 @@ export const getEntityDetails = async (tx: PrismaTransaction, id: string, type: 
 export const updateEntityBalance = async (tx: PrismaTransaction, entity: any, amount: number, type: "customer" | "company" | "driver", operation: "increment" | "decrement" = "decrement") => {
   if (!entity) throw new Error("ENTITY_NOT_FOUND");
   if (type === "customer") {
-    const newBalance = operation === "decrement" ? Number(entity.balance) + amount : Number(entity.balance) - amount;
+    const newBalance = operation === "increment" ? Number(entity.balance) + amount : Number(entity.balance) - amount;
     await tx.customer.update({ where: { id: entity.id }, data: { balance: newBalance } });
   }
   if (type === "company") {

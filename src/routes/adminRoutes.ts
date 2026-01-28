@@ -207,7 +207,7 @@ export const receiveCustomerPayment = async (req: Request, res: Response) => {
         await updateTotalCashAndTodayCash(tx, numericAmount, "increment");
       }
 
-      await updateEntityBalance(tx, entity, numericAmount, type);
+      await updateEntityBalance(tx, entity, numericAmount, type, type === "customer" ? "decrement" : "increment");
 
       updatedTransaction = await tx.transaction.create({
         data: {
@@ -663,7 +663,7 @@ export const updateTransaction = async (req: Request, res: Response) => {
       }
   
       const amountDifference = Number(totalAmount) - Number(transaction.totalAmount);
-      await updateEntityBalance(tx,entity,amountDifference,entityType,"increment");
+      await updateEntityBalance(tx,entity,amountDifference,entityType,entityType==="customer"?"decrement":"increment");
       
       return updated;
     })

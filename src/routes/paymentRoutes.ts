@@ -89,7 +89,7 @@ export const createPayment = async (req: Request, res: Response) => {
       if (!entity) throw new Error("ENTITY_NOT_FOUND");
 
       // 3. Handle Company Balance Logic
-      await updateEntityBalance(tx, entity, numericAmount, entityType as "customer" | "company", "decrement");
+      await updateEntityBalance(tx, entity, numericAmount, entityType as "customer" | "company", entityType === "customer" ? "increment" : "decrement");
 
      await tx.transaction.create({
         data:{
