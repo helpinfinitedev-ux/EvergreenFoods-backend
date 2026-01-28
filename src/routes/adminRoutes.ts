@@ -957,6 +957,24 @@ export const getTotalCapital = async (req: Request, res: Response) => {
   }
 };
 
+export const updateTotalCapital = async (req: Request, res: Response) => {
+  try {
+    const { amount } = req.body;
+    await prisma.$transaction(async(tx)=>{
+      let operation: "increment" | "decrement" = "increment"
+      if(amount<0){
+        operation = "decrement"
+      }
+
+      await updateTotalCashAndTodayCash(tx, Math.abs(amount), operation);
+    })
+    res.json({ success: true, message: "Total capital updated successfully" });
+  } catch (error) {
+    console.error("Update total capital error:", error);
+    res.status(500).json({ error: "Failed to update total capital" });
+  }
+};
+
 // --- Routes ---
 const router = Router();
 router.use(authenticate); // Admin Middleware Check Needed ideally
@@ -1000,6 +1018,7 @@ router.post("/banks/transfer", bankToBank);
 
 // Total capital routes
 router.get("/total-capital", getTotalCapital);
+router.patch("/update-total-capital", updateTotalCapital);
 
 //borrowed info
 router.get("/borrowed-money", getBorrowedInfo);

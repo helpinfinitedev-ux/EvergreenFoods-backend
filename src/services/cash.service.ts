@@ -85,6 +85,10 @@ export const updateTotalCashAndTodayCash = async (
         todayCashUpdate = numericAmount;
     }
 
+    if(operation === "decrement" && capital?.todayCash - numericAmount < 0){
+        todayCashUpdate = {[operation]:capital?.todayCash}
+    }
+
     await tx.totalCapital.update({
         where: { id: totalCashId },
         data: {
