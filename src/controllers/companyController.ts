@@ -114,7 +114,7 @@ export const getCompanyHistory = async (req: Request, res: Response) => {
         companyId: id,
         createdAt: { gte: past },
       },
-      orderBy: { date: "desc" },
+      orderBy: { createdAt: "desc" },
     });
     res.json(history);
   } catch (e) {

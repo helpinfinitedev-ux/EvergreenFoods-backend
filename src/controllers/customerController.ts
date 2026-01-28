@@ -72,9 +72,9 @@ export const getCustomerHistory = async (req: Request, res: Response) => {
     const history = await prisma.transaction.findMany({
       where: {
         customerId: id,
-        date: { gte: past },
+        createdAt: { gte: past },
       },
-      orderBy: { date: "desc" },
+      orderBy: { createdAt: "desc" },
     });
     res.json(history);
   } catch (e) {
