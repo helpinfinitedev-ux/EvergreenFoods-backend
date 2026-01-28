@@ -100,8 +100,8 @@ export const createPayment = async (req: Request, res: Response) => {
           driverId:(req as AuthRequest).user?.userId || "",
           type:"PAYMENT",
           subType:entityType?.toUpperCase(),
-          details:description || null,
-          date:date ? new Date(date) : new Date(),
+          details:description || `Payment to ${entityType?.toUpperCase()} ${entity?.name}`,
+          date:new Date(),
           unit:"INR",
         }
       })
