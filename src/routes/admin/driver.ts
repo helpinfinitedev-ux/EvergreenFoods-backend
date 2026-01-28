@@ -59,7 +59,12 @@ const getDriversActivity = (transactions: Transaction[]) => {
       acc += Number(t.paymentUpi || 0);
       return acc;
     }, 0);
-  const totalSellAmount = totalSellCashAmount + totalSellUpiAmount;
+  const totalSellAmount = transactions
+    .filter((t) => t.type === "SELL")
+    .reduce((acc, t) => {
+      acc += Number(t.totalAmount || 0);
+      return acc;
+    }, 0);
   const totalSellQuantity = transactions
     .filter((t) => t.type === "SELL")
     .reduce((acc, t) => {
