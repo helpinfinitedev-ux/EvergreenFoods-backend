@@ -657,7 +657,7 @@ export const updateTransaction = async (req: Request, res: Response) => {
         include: { driver: true, customer: true, vehicle: true },
       });
   
-      const entity = await getEntityDetails(tx, driverId || customerId || companyId || "", entityType);
+      const entity = await getEntityDetails(tx, companyId||customerId||driverId|| "", entityType);
       if (!entity) {
         throw new Error("ENTITY_NOT_FOUND");
       }
