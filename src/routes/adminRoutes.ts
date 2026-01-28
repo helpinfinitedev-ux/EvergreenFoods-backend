@@ -502,7 +502,7 @@ export const getAdminTransactions = async (req: Request, res: Response) => {
   if (type) where.type = type;
   if (driverId) where.driverId = driverId;
   if (startDate && endDate) {
-    where.date = {
+    where.createdAt = {
       gte: new Date(startDate as string),
       lte: new Date(endDate as string),
     };
@@ -530,7 +530,7 @@ export const getAdminTransactions = async (req: Request, res: Response) => {
       prisma.transaction.findMany({
         where,
         include: { driver: true, customer: true, vehicle: true, company: true },
-        orderBy: { date: "desc" },
+        orderBy: { createdAt: "desc" },
         skip,
         take: pageSize,
       }),
@@ -548,7 +548,7 @@ export const getAdminTransactions = async (req: Request, res: Response) => {
   const logs = await prisma.transaction.findMany({
     where,
     include: { driver: true, customer: true, vehicle: true },
-    orderBy: { date: "desc" },
+    orderBy: { createdAt: "desc" },
     take: 100, // fallback for non-paginated calls
   });
   res.json(logs);
@@ -576,7 +576,7 @@ export const getVehicleById = async (req: Request, res: Response) => {
       where: { id },
       include: {
         drivers: true,
-        transactions: { take: 10, orderBy: { date: "desc" } },
+        transactions: { take: 10, orderBy: { createdAt: "desc" } },
       },
     });
 
