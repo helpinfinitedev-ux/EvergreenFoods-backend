@@ -213,13 +213,13 @@ export const receiveCustomerPayment = async (req: Request, res: Response) => {
         data: {
           type: "RECEIVE_PAYMENT",
           subType: type.toUpperCase(),
-          amount: numericAmount,
+          amount: 0,
           totalAmount: numericAmount,
           details: `In ${method}`,
           customerId,
           companyId,
           driverId: driverId || (req as any).user?.userId,
-          unit: "INR",
+          unit: "Kg",
         },
       });
     });
