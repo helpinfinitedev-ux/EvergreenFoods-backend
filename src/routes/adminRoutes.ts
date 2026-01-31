@@ -529,7 +529,7 @@ export const getAdminTransactions = async (req: Request, res: Response) => {
       prisma.transaction.count({ where }),
       prisma.transaction.findMany({
         where,
-        include: { driver: true, customer: true, vehicle: true, company: true },
+        include: { driver: true, customer: true, vehicle: true, company: true, bank: true },
         orderBy: { createdAt: "desc" },
         skip,
         take: pageSize,
@@ -638,43 +638,44 @@ export const updateVehicle = async (req: Request, res: Response) => {
 export const updateTransaction = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { amount, rate, totalAmount, details, companyId,customerId,driverId,type,entityType } = req.body;
+    const { amount, rate, totalAmount, details, companyId, customerId, driverId, type, entityType } = req.body;
 
     const transaction = await prisma.transaction.findUnique({ where: { id } });
     if (!transaction) {
       return res.status(404).json({ error: "Transaction not found" });
     }
 
-    const updatedTransaction =await prisma.$transaction(async(tx)=>{
-      const updated = await tx.transaction.update({
-        where: { id },
-        data: {
-          amount: amount !== undefined ? Number(amount) : transaction.amount,
-          rate: rate !== undefined ? Number(rate) : transaction.rate,
-          totalAmount: totalAmount !== undefined ? Number(totalAmount) : transaction.totalAmount,
-          details: details !== undefined ? (String(details).trim() === "" ? null : String(details)) : transaction.details,
-        },
-        include: { driver: true, customer: true, vehicle: true },
-      });
+    const updatedTransaction = await prisma.$transaction(
+      async (tx) => {
+        const updated = await tx.transaction.update({
+          where: { id },
+          data: {
+            amount: amount !== undefined ? Number(amount) : transaction.amount,
+            rate: rate !== undefined ? Number(rate) : transaction.rate,
+            totalAmount: totalAmount !== undefined ? Number(totalAmount) : transaction.totalAmount,
+            details: details !== undefined ? (String(details).trim() === "" ? null : String(details)) : transaction.details,
+          },
+          include: { driver: true, customer: true, vehicle: true },
+        });
 
-      console.log(customerId)
-  
-      const entity = await getEntityDetails(tx, companyId||customerId||driverId|| "", entityType);
-      if (!entity) {
-        throw new Error("ENTITY_NOT_FOUND");
+        console.log(customerId);
+
+        const entity = await getEntityDetails(tx, companyId || customerId || driverId || "", entityType);
+        if (!entity) {
+          throw new Error("ENTITY_NOT_FOUND");
+        }
+
+        console.log(entity);
+
+        const amountDifference = Number(totalAmount) - Number(transaction.totalAmount);
+        await updateEntityBalance(tx, entity, amountDifference, entityType, entityType === "customer" ? "decrement" : "increment");
+
+        return updated;
+      },
+      {
+        timeout: 60000,
       }
-
-      console.log(entity)
-  
-      const amountDifference = Number(totalAmount) - Number(transaction.totalAmount);
-      await updateEntityBalance(tx,entity,amountDifference,entityType,entityType==="customer"?"decrement":"increment");
-      
-      return updated;
-    }, {
-      timeout: 60000,
-    })
-
-    
+    );
 
     res.json({ success: true, transaction: updatedTransaction });
   } catch (error) {
@@ -966,14 +967,14 @@ export const getTotalCapital = async (req: Request, res: Response) => {
 export const updateTotalCapital = async (req: Request, res: Response) => {
   try {
     const { amount } = req.body;
-    await prisma.$transaction(async(tx)=>{
-      let operation: "increment" | "decrement" = "increment"
-      if(amount<0){
-        operation = "decrement"
+    await prisma.$transaction(async (tx) => {
+      let operation: "increment" | "decrement" = "increment";
+      if (amount < 0) {
+        operation = "decrement";
       }
 
       await updateTotalCashAndTodayCash(tx, Math.abs(amount), operation);
-    })
+    });
     res.json({ success: true, message: "Total capital updated successfully" });
   } catch (error) {
     console.error("Update total capital error:", error);
@@ -999,7 +1000,7 @@ router.get("/drivers/activity-summary", getAllDriversActivitySummary);
 
 router.get("/customers/due", getCustomersWithDue);
 router.post("/receive-payment", receiveCustomerPayment);
-router.get('/payments-received/:id', getPaymentsReceived)
+router.get("/payments-received/:id", getPaymentsReceived);
 router.post("/financial/note", createFinancialNote);
 router.get("/cash-to-bank", getCashToBank);
 router.post("/cash-to-bank", createCashToBank);

@@ -426,6 +426,9 @@ export const getAllDriversActivitySummary = async (req: Request, res: Response) 
       company: {
         select: { name: true },
       },
+      bank: {
+        select: { name: true },
+      },
     },
   });
 

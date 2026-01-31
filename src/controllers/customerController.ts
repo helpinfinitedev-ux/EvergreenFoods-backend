@@ -25,7 +25,7 @@ export const addCustomer = async (req: Request, res: Response) => {
         balance: balance || 0,
       },
     });
-      res.json(customer);
+    res.json(customer);
   } catch (e) {
     res.status(400).json({ error: "Failed to add customer" });
   }
@@ -75,6 +75,9 @@ export const getCustomerHistory = async (req: Request, res: Response) => {
         createdAt: { gte: past },
       },
       orderBy: { createdAt: "desc" },
+      include: {
+        bank: true,
+      },
     });
     res.json(history);
   } catch (e) {
@@ -123,7 +126,7 @@ export const addCustomerAdvance = async (req: Request, res: Response) => {
 
       const cashAmount = numericAmount;
 
-      await updateTotalCashAndTodayCash(tx,cashAmount,"increment")
+      await updateTotalCashAndTodayCash(tx, cashAmount, "increment");
 
       return updatedCustomer;
     });

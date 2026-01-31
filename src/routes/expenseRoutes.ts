@@ -7,7 +7,7 @@ import { updateBankBalance } from "../services/bank.service";
 // GET all expenses with optional filters
 export const getExpenses = async (req: Request, res: Response) => {
   try {
-    const { type, startDate, endDate, category } = req.query;
+    const { type, startDate, endDate, category, driverId } = req.query;
 
     const where: any = {};
 
@@ -17,6 +17,9 @@ export const getExpenses = async (req: Request, res: Response) => {
 
     if (category) {
       where.category = category;
+    }
+    if (driverId) {
+      where.driverId = driverId as string;
     }
 
     if (startDate || endDate) {
@@ -32,12 +35,12 @@ export const getExpenses = async (req: Request, res: Response) => {
     const expenses = await prisma.expense.findMany({
       where,
       orderBy: { date: "desc" },
-      include:{
-        driver:{
-          select:{
-            name:true,
-            id:true
-          }
+      include: {
+        driver: {
+          select: {
+            name: true,
+            id: true,
+          },
         },
       },
     });
@@ -126,12 +129,12 @@ export const createExpense = async (req: Request, res: Response) => {
         data: {
           amount: 0,
           totalAmount: numericAmount,
-          driverId: driverId || "",
+          driverId: driverId || (req as any).user?.userId || "",
           type: "EXPENSE",
-          subType: driverId ? "SALARY" : "",
+          subType: category?.toLocaleUpperCase(),
           details: description || null,
           date: date ? new Date(date) : new Date(),
-          unit:"INR",
+          unit: "INR",
         },
       });
 
