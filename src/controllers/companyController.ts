@@ -28,10 +28,7 @@ export const getCompanies = async (req: Request, res: Response) => {
       queryObj.skip = skip;
     }
     // queryObj.include = { company: true };
-    const [total, companies] = await Promise.all([
-      prisma.company.count({ where }),
-      prisma.company.findMany(queryObj),
-    ]);
+    const [total, companies] = await Promise.all([prisma.company.count({ where }), prisma.company.findMany(queryObj)]);
     // console.log(companies?.length);
     res.json({
       page,
@@ -115,6 +112,9 @@ export const getCompanyHistory = async (req: Request, res: Response) => {
         createdAt: { gte: past },
       },
       orderBy: { createdAt: "desc" },
+      include: {
+        driver: true,
+      },
     });
     res.json(history);
   } catch (e) {

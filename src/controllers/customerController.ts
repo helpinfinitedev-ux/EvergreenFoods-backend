@@ -77,6 +77,7 @@ export const getCustomerHistory = async (req: Request, res: Response) => {
       orderBy: { createdAt: "desc" },
       include: {
         bank: true,
+        driver: true,
       },
     });
     res.json(history);
