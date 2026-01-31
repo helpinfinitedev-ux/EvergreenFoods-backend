@@ -103,38 +103,45 @@ export const addSellEntry = async (req: Request, res: Response) => {
 
     // 2. Wrap in Transaction
     // We need to update Customer Balance + Create Transaction atomically
-    const result = await prisma.$transaction(async (tx) => {
-      // Create Sell Transaction
-      const entity = await getEntityDetails(tx, customerId || companyId || driverId || userId, entityType);
-      console.log(entity);
-      const transaction = await tx.transaction.create({
-        data: {
-          driverId: driverId || userId,
-          type: "SELL",
-          amount: Number(amount || 0),
-          unit: "KG",
-          rate: Number(rate || 0),
-          totalAmount: Number(totalAmount || 0),
-          paymentCash,
-          paymentUpi,
-          bankId,
-          customerId,
-          companyId,
-          details,
-        },
-      });
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // Create Sell Transaction
+        const entity = await getEntityDetails(tx, customerId || companyId || driverId || userId, entityType);
+        console.log(entity);
+        const transaction = await tx.transaction.create({
+          data: {
+            driverId: driverId || userId,
+            type: "SELL",
+            amount: Number(amount || 0),
+            unit: "KG",
+            rate: Number(rate || 0),
+            totalAmount: Number(totalAmount || 0),
+            paymentCash,
+            paymentUpi,
+            bankId,
+            customerId,
+            companyId,
+            details,
+          },
+        });
 
-      // Update Customer Balance
-      // Balance = Old Balance + Bill Amount - (Cash + UPI)
-      const bill = Number(totalAmount);
-      const paid = Number(paymentCash || 0) + Number(paymentUpi || 0);
-      const change = bill - paid;
+        // Update Customer Balance
+        // Balance = Old Balance + Bill Amount - (Cash + UPI)
+        const bill = Number(totalAmount);
+        const paid = Number(paymentCash || 0) + Number(paymentUpi || 0);
+        const change = bill - paid;
 
-      await updateEntityBalance(tx, entity, change, entityType, entityType === "customer" ? "increment" : "decrement");
-      await updateBankBalance(tx, bankId, Number(paymentUpi || 0), "increment");
+        await updateEntityBalance(tx, entity, change, entityType, entityType === "customer" ? "increment" : "decrement");
+        if (bankId) {
+          await updateBankBalance(tx, bankId, Number(paymentUpi || 0), "increment");
+        }
 
-      return transaction;
-    });
+        return transaction;
+      },
+      {
+        timeout: 20000,
+      }
+    );
 
     res.json(result);
   } catch (e) {
