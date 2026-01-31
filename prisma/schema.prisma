@@ -26,7 +26,7 @@ enum TransactionType {
   RECEIVE_PAYMENT
   PAYMENT
   PAYMENT_TO_COMPANY
-  PAYMENTNK
+  PAYMENT_TO_BANK
   PAYMENT_TO_EXPENSE
   PAYMENT_TO_OTHER
   CASH_TO_BANK
@@ -141,6 +141,7 @@ model Transaction {
   paltiAction        String? // ADD or SUBTRACT
   company Company? @relation(fields: [companyId], references: [id])
   companyId String?
+  payments Payments[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -230,6 +231,8 @@ model Payments {
   customer Customer? @relation(fields: [customerId], references: [id])
   customerId String?
   driver User? @relation(fields: [driverId], references: [id])
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+  transactionId String?
   driverId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

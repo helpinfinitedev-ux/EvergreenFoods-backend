@@ -32,12 +32,9 @@ export const getPayments = async (req: Request, res: Response) => {
       queryObj.skip = skip;
     }
     queryObj.include = { Company: true };
-    queryObj.include = {customer:true}
+    queryObj.include = { customer: true };
 
-    const [total, rows] = await Promise.all([
-      prisma.payments.count({ where }),
-      prisma.payments.findMany(queryObj),
-    ]);
+    const [total, rows] = await Promise.all([prisma.payments.count({ where }), prisma.payments.findMany(queryObj)]);
     console.log(rows?.length);
 
     res.json({
@@ -56,71 +53,72 @@ export const getPayments = async (req: Request, res: Response) => {
 // POST create a new payment
 export const createPayment = async (req: Request, res: Response) => {
   try {
-    const { amount, companyName, description, date, bankId, companyId, customerId, entityType } =
-      req.body as {
-        amount: number;
-        companyName?: string;
-        description?: string;
-        date?: string;
-        bankId?: string;
-        companyId?: string;
-        customerId?: string;
-        entityType?:string;
-      };
+    const { amount, companyName, description, date, bankId, companyId, customerId, entityType } = req.body as {
+      amount: number;
+      companyName?: string;
+      description?: string;
+      date?: string;
+      bankId?: string;
+      companyId?: string;
+      customerId?: string;
+      entityType?: string;
+    };
 
     const numericAmount = Number(amount);
     if (Number.isNaN(numericAmount) || numericAmount <= 0) {
       return res.status(400).json({ error: "amount must be a number > 0" });
     }
 
-    const payment = await prisma.$transaction(async (tx) => {
-      // 1. Handle Bank Logic
-      if (bankId) {
-        await updateBankBalance(tx,bankId,numericAmount,"decrement");
-      }
-      else{
-
-        await updateTotalCashAndTodayCash(tx, numericAmount, "decrement");
-      }
-      if(!entityType || !["customer","company"].includes(entityType as "customer" | "company")){
-        throw new Error("INVALID_ENTITY_TYPE");
-      }
-      const entity = await getEntityDetails(tx, customerId || companyId || "", entityType as "customer" | "company");
-      if (!entity) throw new Error("ENTITY_NOT_FOUND");
-
-      // 3. Handle Company Balance Logic
-      await updateEntityBalance(tx, entity, numericAmount, entityType as "customer" | "company", entityType === "customer" ? "increment" : "decrement");
-
-     await tx.transaction.create({
-        data:{
-          amount:0,
-          totalAmount:numericAmount,
-          companyId:companyId || null,
-          customerId:customerId || null,
-          driverId:(req as AuthRequest).user?.userId || "",
-          type:"PAYMENT",
-          subType:entityType?.toUpperCase(),
-          details:description || `Payment to ${entityType?.toUpperCase()} ${entity?.name}`,
-          date:new Date(),
-          unit:"INR",
+    const payment = await prisma.$transaction(
+      async (tx) => {
+        // 1. Handle Bank Logic
+        if (bankId) {
+          await updateBankBalance(tx, bankId, numericAmount, "decrement");
+        } else {
+          await updateTotalCashAndTodayCash(tx, numericAmount, "decrement");
         }
-      })
+        if (!entityType || !["customer", "company"].includes(entityType as "customer" | "company")) {
+          throw new Error("INVALID_ENTITY_TYPE");
+        }
+        const entity = await getEntityDetails(tx, customerId || companyId || "", entityType as "customer" | "company");
+        if (!entity) throw new Error("ENTITY_NOT_FOUND");
 
-      return  tx.payments.create({
-        data: {
-          amount: numericAmount,
-          companyName: companyName || null,
-          description: description || null,
-          date: date ? new Date(date) : new Date(),
-          bankId: bankId || null,
-          companyId: companyId || null,
-          customerId: customerId || null,
-        },
-      });
-    },{
-      timeout: 60_000, // 60 seconds
-    maxWait: 10_000, // wait for a connection
-    });
+        // 3. Handle Company Balance Logic
+        await updateEntityBalance(tx, entity, numericAmount, entityType as "customer" | "company", entityType === "customer" ? "increment" : "decrement");
+
+        const transaction = await tx.transaction.create({
+          data: {
+            amount: 0,
+            totalAmount: numericAmount,
+            companyId: companyId || null,
+            customerId: customerId || null,
+            driverId: (req as AuthRequest).user?.userId || "",
+            type: "PAYMENT",
+            subType: entityType?.toUpperCase(),
+            details: description || `Payment to ${entityType?.toUpperCase()} ${entity?.name}`,
+            date: new Date(),
+            unit: "INR",
+          },
+        });
+
+        return tx.payments.create({
+          data: {
+            amount: numericAmount,
+            companyName: companyName || null,
+            description: description || null,
+            date: date ? new Date(date) : new Date(),
+            bankId: bankId || null,
+            companyId: companyId || null,
+            customerId: customerId || null,
+            transactionId: transaction.id,
+          },
+        });
+      },
+      {
+        timeout: 60_000, // 60 seconds
+        maxWait: 10_000, // wait for a connection
+      }
+    );
 
     res.status(201).json(payment);
   } catch (error) {
@@ -225,6 +223,13 @@ export const deletePayment = async (req: Request, res: Response) => {
         });
       }
 
+      if (existing.customerId) {
+        await tx.customer.update({
+          where: { id: existing.customerId },
+          data: { balance: { decrement: existing.amount } },
+        });
+      }
+
       // Revert Bank Balance if linked
       if (existing.bankId) {
         await tx.bank.update({
@@ -248,6 +253,9 @@ export const deletePayment = async (req: Request, res: Response) => {
       }
 
       await tx.payments.delete({ where: { id } });
+      if (existing?.transactionId) {
+        await tx.transaction.delete({ where: { id: existing.transactionId } });
+      }
     });
 
     res.json({ success: true });
