@@ -2,6 +2,7 @@ import { prisma } from "../../app";
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { Transaction } from "@prisma/client";
+import { Num } from "../../utils/num";
 
 type PaymentBreakdown = {
   totalCollection: number;
@@ -45,6 +46,8 @@ type DriverReportPdfInput = {
   // optional label/date at top if you want
   titleRight?: string; // e.g. "Date: 23 Jan 2026"
 };
+
+const isNil = (val: any) => val === null || val === undefined;
 
 const getDriversActivity = (transactions: Transaction[]) => {
   const totalSellCashAmount = transactions
@@ -146,16 +149,30 @@ export const generateTodaysReport = async (req: Request, res: Response) => {
   transactions.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   let customerToBalanceMap: Record<string, any> = {};
+
+  const getEntityBalance = (t: any) => {
+    let balance = 0;
+    const change = Number(t.totalAmount) - Number(t.paymentCash || 0) - Number(t.paymentUpi || 0);
+    const entityId = t.customer?.id || t?.company?.id || t?.driver?.id || "";
+
+    balance = (Number(customerToBalanceMap[entityId]) || 0) + t?.company?.idchange;
+
+    customerToBalanceMap[entityId] = balance;
+    return balance;
+  };
+
   const customers = transactions
     .filter((t) => t.type === "SELL")
     .map((t) => {
       const change = Number(t.totalAmount) - Number(t.paymentCash || 0) - Number(t.paymentUpi || 0);
-      const entityId = t.customer?.id || t?.company?.id || t?.driver?.id || "";
-      const balance = (Number(customerToBalanceMap[entityId]) || 0) + Number(t.customer?.balance || t?.company?.amountDue || 0) + change;
+      const entityId = t.customer?.id || t?.company?.id || t?.driver?.id;
+      let balance = 0;
+      balance = Num(t?.customer?.balance) || Num(t?.company?.amountDue) || 0;
+
       customerToBalanceMap[entityId] = balance;
-      console.log(customerToBalanceMap);
+      console.log("BALANCE", balance);
       return {
-        customerName: t.customer?.name || t?.company?.name || t?.driver?.name,
+        customerName: t?.customer?.name || t?.company?.name || t?.driver?.name,
         quantityKg: Number(t.amount || 0),
         rate: Number(t.rate || 0),
         price: Number(t.totalAmount || 0),
