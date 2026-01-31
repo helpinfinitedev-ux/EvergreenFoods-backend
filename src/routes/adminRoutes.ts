@@ -218,6 +218,7 @@ export const receiveCustomerPayment = async (req: Request, res: Response) => {
           details: `In ${method}`,
           customerId,
           companyId,
+          bankId: method === "BANK" ? bankId : null,
           driverId: driverId || (req as any).user?.userId,
           unit: "Kg",
         },
