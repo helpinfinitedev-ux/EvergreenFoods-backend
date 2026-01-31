@@ -47,7 +47,7 @@ type DriverReportPdfInput = {
 };
 
 const getDriversActivity = (transactions: Transaction[]) => {
- const totalSellCashAmount = transactions
+  const totalSellCashAmount = transactions
     .filter((t) => t.type === "SELL")
     .reduce((acc, t) => {
       acc += Number(t.paymentCash || 0);
@@ -143,19 +143,17 @@ export const generateTodaysReport = async (req: Request, res: Response) => {
       },
     },
   });
-  transactions.sort((a,b)=>new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  transactions.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-  let customerToBalanceMap: Record<string,any> = {};
+  let customerToBalanceMap: Record<string, any> = {};
   const customers = transactions
     .filter((t) => t.type === "SELL")
     .map((t) => {
       const change = Number(t.totalAmount) - Number(t.paymentCash || 0) - Number(t.paymentUpi || 0);
       const entityId = t.customer?.id || t?.company?.id || t?.driver?.id || "";
-      const balance = (Number(customerToBalanceMap[entityId]) || 0) +  Number(t.customer?.balance 
-        || t?.company?.amountDue
-        || 0) + change;
+      const balance = (Number(customerToBalanceMap[entityId]) || 0) + Number(t.customer?.balance || t?.company?.amountDue || 0) + change;
       customerToBalanceMap[entityId] = balance;
-      console.log(customerToBalanceMap)
+      console.log(customerToBalanceMap);
       return {
         customerName: t.customer?.name || t?.company?.name || t?.driver?.name,
         quantityKg: Number(t.amount || 0),
@@ -166,7 +164,7 @@ export const generateTodaysReport = async (req: Request, res: Response) => {
       };
     });
 
-    console.log('customer', customerToBalanceMap)
+  console.log("customer", customerToBalanceMap);
 
   const payments = transactions
     .filter((t) => t.type === "SELL")
