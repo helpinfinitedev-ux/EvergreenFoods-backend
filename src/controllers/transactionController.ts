@@ -9,6 +9,7 @@ import { TRANSACTION_TYPE } from "../utils/constants";
 import { deleteSellTransaction } from "../services/transactions/index.service";
 import { getEntityDetails, updateEntityBalance } from "../services/transactions/receivePayments.service";
 import { Transaction } from "@prisma/client";
+import { updateBankBalance } from "../services/bank.service";
 
 // Dashboard Summary
 export const getDashboardSummary = async (req: Request, res: Response) => {
@@ -130,6 +131,7 @@ export const addSellEntry = async (req: Request, res: Response) => {
       const change = bill - paid;
 
       await updateEntityBalance(tx, entity, change, entityType, entityType === "customer" ? "increment" : "decrement");
+      await updateBankBalance(tx, bankId, Number(paymentUpi || 0), "decrement");
 
       return transaction;
     });
