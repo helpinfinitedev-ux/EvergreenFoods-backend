@@ -27,7 +27,9 @@ type CustomerRow = {
   customerName: string;
   quantityKg: number;
   price: number; // per-unit or total, your call—just be consistent
-  deposit: number;
+  depositCash: number;
+  depositUpi: number;
+  bankName: string;
   rate: number;
 };
 
@@ -144,6 +146,9 @@ export const generateTodaysReport = async (req: Request, res: Response) => {
       company: {
         select: { name: true, id: true, amountDue: true },
       },
+      bank: {
+        select: { name: true, id: true },
+      },
     },
   });
   transactions.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -176,7 +181,9 @@ export const generateTodaysReport = async (req: Request, res: Response) => {
         quantityKg: Number(t.amount || 0),
         rate: Number(t.rate || 0),
         price: Number(t.totalAmount || 0),
-        deposit: Number(t.paymentCash || 0) + Number(t.paymentUpi || 0),
+        depositCash: Number(t.paymentCash || 0),
+        depositUpi: Number(t.paymentUpi || 0),
+        bankName: t.bank?.name || "",
         balance: balance,
       };
     });
