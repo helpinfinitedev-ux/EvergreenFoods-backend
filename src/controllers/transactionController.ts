@@ -91,7 +91,7 @@ export const addSellEntry = async (req: Request, res: Response) => {
     const userId = (req as AuthRequest).user?.userId;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const { amount, entityType, customerId, companyId, driverId, rate, totalAmount, paymentCash, paymentUpi, details } = req.body;
+    const { amount, entityType, bankId, customerId, companyId, driverId, rate, totalAmount, paymentCash, paymentUpi, details } = req.body;
 
     // 1. Check Stock
     const currentStock = await getDriverStock(userId);
@@ -116,6 +116,7 @@ export const addSellEntry = async (req: Request, res: Response) => {
           totalAmount: Number(totalAmount || 0),
           paymentCash,
           paymentUpi,
+          bankId,
           customerId,
           companyId,
           details,

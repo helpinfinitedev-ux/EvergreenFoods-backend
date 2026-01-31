@@ -135,6 +135,8 @@ model Transaction {
   customerId   String?
   vehicle      Vehicle?  @relation(fields: [vehicleId], references: [id])
   vehicleId    String?
+  bank Bank? @relation(fields: [bankId], references: [id])
+  bankId String?
   
   // Palti Specific
   transferDriverName String?
@@ -199,6 +201,7 @@ model Bank {
   cashToBank CashToBank[]
   payments   Payments[]
   expenses   Expense[]
+  transactions Transaction[]
 
 
   @@map("bank")
