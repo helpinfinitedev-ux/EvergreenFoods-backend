@@ -51,14 +51,14 @@ export const addBuyEntry = async (req: Request, res: Response) => {
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { amount, type, entityType, rate, totalAmount, details, imageUrl, companyName, companyId, driverId, customerId } = req.body;
-    
+
     const createdTxn = await prisma.$transaction(async (tx) => {
       const entity = await getEntityDetails(tx, driverId || customerId || companyId || "", entityType);
 
       if (!entity) {
         throw new Error("ENTITY_NOT_FOUND");
       }
-      
+
       const txn = await tx.transaction.create({
         data: {
           driverId: driverId || userId,
@@ -71,16 +71,16 @@ export const addBuyEntry = async (req: Request, res: Response) => {
           details,
           imageUrl,
           companyId,
-          customerId
+          customerId,
         },
       });
-      
+
       return txn;
     });
 
     res.json(createdTxn);
   } catch (e) {
-    console.log(e)
+    console.log(e);
     res.status(500).json({ error: "Failed to add entry" });
   }
 };
@@ -91,11 +91,11 @@ export const addSellEntry = async (req: Request, res: Response) => {
     const userId = (req as AuthRequest).user?.userId;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const { amount,entityType, customerId, companyId, driverId, rate, totalAmount, paymentCash, paymentUpi, details } = req.body;
+    const { amount, entityType, customerId, companyId, driverId, rate, totalAmount, paymentCash, paymentUpi, details } = req.body;
 
     // 1. Check Stock
     const currentStock = await getDriverStock(userId);
-    if (amount > currentStock) {
+    if (amount > currentStock + 0.1) {
       // Allow a tiny margin for float errors? No, strict for now.
       return res.status(400).json({ error: `Insufficient stock. Available: ${currentStock}` });
     }
@@ -104,8 +104,8 @@ export const addSellEntry = async (req: Request, res: Response) => {
     // We need to update Customer Balance + Create Transaction atomically
     const result = await prisma.$transaction(async (tx) => {
       // Create Sell Transaction
-      const entity =await getEntityDetails(tx, customerId || companyId || driverId || userId, entityType)
-      console.log(entity)
+      const entity = await getEntityDetails(tx, customerId || companyId || driverId || userId, entityType);
+      console.log(entity);
       const transaction = await tx.transaction.create({
         data: {
           driverId: driverId || userId,
@@ -128,7 +128,7 @@ export const addSellEntry = async (req: Request, res: Response) => {
       const paid = Number(paymentCash || 0) + Number(paymentUpi || 0);
       const change = bill - paid;
 
-      await updateEntityBalance(tx, entity, change,entityType,entityType === "customer" ? "increment" : "decrement");
+      await updateEntityBalance(tx, entity, change, entityType, entityType === "customer" ? "increment" : "decrement");
 
       return transaction;
     });

@@ -656,16 +656,22 @@ export const updateTransaction = async (req: Request, res: Response) => {
         },
         include: { driver: true, customer: true, vehicle: true },
       });
+
+      console.log(customerId)
   
       const entity = await getEntityDetails(tx, companyId||customerId||driverId|| "", entityType);
       if (!entity) {
         throw new Error("ENTITY_NOT_FOUND");
       }
+
+      console.log(entity)
   
       const amountDifference = Number(totalAmount) - Number(transaction.totalAmount);
       await updateEntityBalance(tx,entity,amountDifference,entityType,entityType==="customer"?"decrement":"increment");
       
       return updated;
+    }, {
+      timeout: 60000,
     })
 
     
