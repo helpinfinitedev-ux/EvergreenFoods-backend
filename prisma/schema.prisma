@@ -229,7 +229,7 @@ model Payments {
   date DateTime @default(now())
   bank Bank? @relation(fields: [bankId], references: [id])
   bankId String?
-  Company Company? @relation(fields: [companyId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
   companyId String?
   customer Customer? @relation(fields: [customerId], references: [id])
   customerId String?

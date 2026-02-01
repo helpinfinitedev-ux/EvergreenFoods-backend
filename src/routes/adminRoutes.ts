@@ -497,11 +497,25 @@ export const deleteCashToBank = async (req: Request, res: Response) => {
 
 // 4. Reports (Transactions)
 export const getAdminTransactions = async (req: Request, res: Response) => {
-  const { type, startDate, endDate, driverId, details, page, companyName } = req.query;
+  const { type, startDate, bankId, endDate, customerId, companyId, totalAmount, driverId, details, page, companyName } = req.query;
 
   const where: any = {};
   if (type) where.type = type;
   if (driverId) where.driverId = driverId;
+  if (customerId) where.customerId = customerId;
+  if (companyId) where.companyId = companyId;
+  if (bankId) where.bankId = bankId;
+  if (totalAmount) {
+    where.totalAmount = {
+      gte: Number(totalAmount),
+    };
+    where.paymentCash = {
+      gte: Number(totalAmount),
+    };
+    where.paymentUpi = {
+      gte: Number(totalAmount),
+    };
+  }
   if (startDate && endDate) {
     where.createdAt = {
       gte: new Date(startDate as string),
@@ -707,6 +721,20 @@ export const deleteTransaction = async (req: Request, res: Response) => {
             where: { id: transaction.customerId },
             data: { balance: { increment: -change } },
           });
+        }
+      }
+      if (transaction?.companyId) {
+        const bill = Number(transaction.totalAmount || 0);
+        const paid = Number(transaction.paymentCash || 0) + Number(transaction.paymentUpi || 0);
+        const change = bill - paid;
+        if (change !== 0) {
+          await tx.company.update({
+            where: { id: transaction.companyId },
+            data: { amountDue: { increment: -change } },
+          });
+        }
+        if (transaction?.bankId) {
+          await updateBankBalance(tx, transaction.bankId, paid, "increment");
         }
       }
 
