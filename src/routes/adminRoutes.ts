@@ -9,6 +9,7 @@ import { getEntityDetails, updateEntityBalance } from "../services/transactions/
 import { updateBankBalance } from "../services/bank.service";
 import { Transaction } from "@prisma/client";
 import { getPaymentsReceived } from "./admin/payments";
+import { cashFlow } from "./admin/cashFlow";
 
 // --- Controllers ---
 
@@ -1061,5 +1062,8 @@ router.get("/borrowed-money", getBorrowedInfo);
 router.post("/borrowed-money", addBorrowedInfo);
 router.put("/borrowed-money/:id", updateBorrowedInfo);
 router.delete("/borrowed-money/:id", deleteBorrowedInfo);
+
+//cash flow
+router.get("/cash-flow", cashFlow);
 
 export default router;

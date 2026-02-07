@@ -124,21 +124,7 @@ export const createExpense = async (req: Request, res: Response) => {
       if (type === "CASH") {
         await updateTotalCashAndTodayCash(tx, numericAmount, "decrement");
       }
-
-      await tx.transaction.create({
-        data: {
-          amount: 0,
-          totalAmount: numericAmount,
-          driverId: driverId || (req as any).user?.userId || "",
-          type: "EXPENSE",
-          subType: category?.toLocaleUpperCase(),
-          details: description || null,
-          date: date ? new Date(date) : new Date(),
-          unit: "INR",
-        },
-      });
-
-      return tx.expense.create({
+      const expense = await tx.expense.create({
         data: {
           type,
           amount: numericAmount,
@@ -149,6 +135,22 @@ export const createExpense = async (req: Request, res: Response) => {
           driverId: driverId || null,
         },
       });
+      await tx.transaction.create({
+        data: {
+          amount: 0,
+          totalAmount: numericAmount,
+          driverId: driverId || (req as any).user?.userId || "",
+          type: "EXPENSE",
+          subType: category?.toLocaleUpperCase(),
+          details: description || null,
+          date: date ? new Date(date) : new Date(),
+          unit: "",
+          bankId: type === "BANK" ? bankId : null,
+          expenseId: expense.id,
+        },
+      });
+
+      return expense;
     });
 
     res.status(201).json(created);

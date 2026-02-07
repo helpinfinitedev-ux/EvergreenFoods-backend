@@ -144,7 +144,8 @@ model Transaction {
   company Company? @relation(fields: [companyId], references: [id])
   companyId String?
   payments Payments[]
-
+  expense Expense? @relation(fields: [expenseId], references: [id])
+  expenseId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -175,6 +176,7 @@ model Expense {
   driverId    String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  transactions Transaction[]
 
   @@map("expenses")
 }
