@@ -41,7 +41,7 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
   const cashToBankTxnByDriver = cashToBankTransactions.reduce(
     (acc, t: any) => {
       acc[t.driverId] = {
-        narration: `Deposited to ${t.cashToBank?.bankName}`,
+        narration: `Deposited to ${t.bank?.name}`,
         amount: (acc?.[t.driverId]?.amount || 0) + Number(t.totalAmount || 0),
         createdAt: t.createdAt,
       };
