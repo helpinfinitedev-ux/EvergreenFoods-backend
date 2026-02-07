@@ -380,6 +380,21 @@ export const createCashToBank = async (req: Request, res: Response) => {
         }
       }
 
+      const transaction = await tx.transaction.create({
+        data: {
+          amount: 0,
+          totalAmount: numericAmount,
+          driverId: (req as any).user.userId,
+          type: "CASH_TO_BANK",
+          subType: "DEPOSIT",
+          details: `Deposited to ${bankName}`,
+          date: parsedDate,
+          unit: "INR",
+          bankId,
+          cashToBankId: cashToBank.id,
+        },
+      });
+
       return cashToBank;
     });
 
@@ -399,7 +414,7 @@ export const updateCashToBank = async (req: Request, res: Response) => {
       bankId?: string;
     };
 
-    const existing = await prisma.cashToBank.findUnique({ where: { id } });
+    const existing = await prisma.cashToBank.findUnique({ where: { id }, include: { transactions: true } });
     if (!existing) return res.status(404).json({ error: "CashToBank entry not found" });
 
     const data: any = {};
@@ -468,6 +483,17 @@ export const updateCashToBank = async (req: Request, res: Response) => {
           });
         }
       }
+
+      await tx.transaction.update({
+        where: { id: existing.transactions[0]?.id },
+        data: {
+          cashToBankId: cashToBank.id,
+          totalAmount: newAmount,
+          details: `Updated cash-to-bank to ${bankName}`,
+          bankId: newBankId,
+          amount: 0,
+        },
+      });
 
       return cashToBank;
     });

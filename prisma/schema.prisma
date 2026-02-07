@@ -146,6 +146,8 @@ model Transaction {
   payments Payments[]
   expense Expense? @relation(fields: [expenseId], references: [id])
   expenseId String?
+  cashToBank CashToBank? @relation(fields: [cashToBankId], references: [id])
+  cashToBankId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -215,6 +217,7 @@ model CashToBank {
   bankName String
   bank Bank @relation(fields: [bankId], references: [id])
   bankId String 
+  transactions Transaction[]
   operation CashToBankOperation @default(DEPOSIT)
   date DateTime @default(now())
   createdAt DateTime @default(now())

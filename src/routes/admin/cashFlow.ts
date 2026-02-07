@@ -6,9 +6,11 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
   let sellTransactions = transactions.filter((t) => t.type === "SELL");
 
   let advancePaymentTransactions = transactions.filter((t) => t.type === "RECEIVE_PAYMENT").filter((t) => t.companyId || t.customerId);
+  let cashToBankTransactions = transactions.filter((t) => t.type === "CASH_TO_BANK");
 
   if (!isBank) {
     advancePaymentTransactions = advancePaymentTransactions.filter((t) => t.bankId === null);
+    cashToBankTransactions = cashToBankTransactions.filter((t) => t.bankId === null);
   }
 
   const sellTxnByDriver = sellTransactions.reduce(
@@ -26,9 +28,9 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
 
   const receivePaymentByCompanyAndCustomer = advancePaymentTransactions.reduce(
     (acc, t: any) => {
-      acc[t.companyId || t.customerId] = {
-        narration: "Payment received from " + (t.company?.name || "") + " " + (t.customer?.name || "") + " ",
-        amount: (acc?.[t.companyId || t.customerId]?.amount || 0) + Number(t.totalAmount || 0),
+      acc[t.companyId || t.customerId || t.driverId] = {
+        narration: "Payment received from " + (t.company?.name || "") + " " + (t.customer?.name || "") + " " + (t.driver?.name || "") + " ",
+        amount: (acc?.[t.companyId || t.customerId || t.driverId]?.amount || 0) + Number(t.totalAmount || 0),
         createdAt: t.createdAt,
       };
       return acc;
@@ -36,7 +38,19 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
     {} as Record<string, any>
   );
 
-  const res = [...Object.values(sellTxnByDriver), ...Object.values(receivePaymentByCompanyAndCustomer)].sort((a, b) => b.createdAt - a.createdAt);
+  const cashToBankTxnByDriver = cashToBankTransactions.reduce(
+    (acc, t: any) => {
+      acc[t.driverId] = {
+        narration: `Deposited to ${t.cashToBank?.bankName}`,
+        amount: (acc?.[t.driverId]?.amount || 0) + Number(t.totalAmount || 0),
+        createdAt: t.createdAt,
+      };
+      return acc;
+    },
+    {} as Record<string, any>
+  );
+
+  const res = [...Object.values(sellTxnByDriver), ...Object.values(receivePaymentByCompanyAndCustomer), ...Object.values(cashToBankTxnByDriver)].sort((a, b) => b.createdAt - a.createdAt);
   return res.map((r) => ({
     narration: r.narration,
     amount: r.amount,
