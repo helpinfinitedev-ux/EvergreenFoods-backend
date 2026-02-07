@@ -46,7 +46,7 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
 
 const getCashOut = async (transactions: Transaction[], isBank: boolean) => {
   const paymentTransactions = transactions.filter((t) => t.type === "PAYMENT");
-  const expenseTransactions = paymentTransactions.filter((t) => t.type === "EXPENSE");
+  const expenseTransactions = transactions.filter((t) => t.type === "EXPENSE");
   const sellTxnByDriver = paymentTransactions.reduce(
     (acc, t: any) => {
       acc[t.companyId || t.customerId] = {
@@ -58,6 +58,8 @@ const getCashOut = async (transactions: Transaction[], isBank: boolean) => {
     },
     {} as Record<string, any>
   );
+
+  console.log(expenseTransactions);
 
   const expenseTxnByDriver = expenseTransactions.reduce(
     (acc, t: any) => {
