@@ -18,9 +18,9 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
 
   const sellTxnByDriver = sellTransactions.reduce(
     (acc, t: any) => {
-      acc[t.driverId] = {
-        narration: t.driver?.name + " " + "Received",
-        amount: (acc?.[t.driverId]?.amount || 0) + (isBank ? Number(t.paymentUpi || 0) : Number(t.paymentCash || 0)),
+      acc[t.id] = {
+        narration: t.driver?.name + " " + "Received" + `from ${t.company?.name || t.customer?.name || t.driver?.name}`,
+        amount: (acc?.[t.id]?.amount || 0) + (isBank ? Number(t.paymentUpi || 0) : Number(t.paymentCash || 0)),
         createdAt: t.createdAt,
       };
 
@@ -31,9 +31,9 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
 
   const receivePaymentByCompanyAndCustomer = advancePaymentTransactions.reduce(
     (acc, t: any) => {
-      acc[t.companyId || t.customerId || t.driverId] = {
+      acc[t.id] = {
         narration: "Payment received from " + (t.company?.name || "") + " " + (t.customer?.name || "") + " " + (t.driver?.name || "") + " ",
-        amount: (acc?.[t.companyId || t.customerId || t.driverId]?.amount || 0) + Number(t.totalAmount || 0),
+        amount: (acc?.[t.id]?.amount || 0) + Number(t.totalAmount || 0),
         createdAt: t.createdAt,
       };
       return acc;
@@ -72,9 +72,9 @@ const getCashOut = async (transactions: Transaction[], isBank: boolean) => {
 
   const sellTxnByDriver = paymentTransactions.reduce(
     (acc, t: any) => {
-      acc[t.companyId || t.customerId] = {
+      acc[t.id] = {
         narration: "Payment done to " + (t.company?.name || "") + " " + (t.customer?.name || "") + " ",
-        amount: (acc?.[t.companyId || t.customerId]?.amount || 0) + Number(t.totalAmount || 0),
+        amount: (acc?.[t.id]?.amount || 0) + Number(t.totalAmount || 0),
         createdAt: t.createdAt,
       };
       return acc;
