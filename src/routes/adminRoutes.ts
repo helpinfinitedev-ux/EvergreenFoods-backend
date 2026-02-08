@@ -757,7 +757,7 @@ export const deleteTransaction = async (req: Request, res: Response) => {
         if (change !== 0) {
           await tx.company.update({
             where: { id: transaction.companyId },
-            data: { amountDue: { increment: -change } },
+            data: { amountDue: { increment: change } },
           });
         }
         if (transaction?.bankId) {
