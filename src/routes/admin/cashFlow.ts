@@ -19,7 +19,7 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
   const sellTxnByDriver = sellTransactions.reduce(
     (acc, t: any) => {
       acc[t.driverId] = {
-        narration: t.driver?.name + " " + "Supply",
+        narration: t.driver?.name + " " + "Received",
         amount: (acc?.[t.driverId]?.amount || 0) + (isBank ? Number(t.paymentUpi || 0) : Number(t.paymentCash || 0)),
         createdAt: t.createdAt,
       };
