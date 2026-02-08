@@ -9,8 +9,11 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
   let cashToBankTransactions = transactions.filter((t) => t.type === "CASH_TO_BANK");
 
   if (!isBank) {
+    sellTransactions = [];
     advancePaymentTransactions = advancePaymentTransactions.filter((t) => t.bankId === null);
     cashToBankTransactions = cashToBankTransactions.filter((t) => t.bankId === null);
+  } else {
+    sellTransactions = sellTransactions.filter((t) => t.bankId !== null);
   }
 
   const sellTxnByDriver = sellTransactions.reduce(
