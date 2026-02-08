@@ -40,9 +40,9 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
 
   const cashToBankTxnByDriver = cashToBankTransactions.reduce(
     (acc, t: any) => {
-      acc[t.driverId] = {
+      acc[t.id] = {
         narration: `Deposited to ${t.bank?.name}`,
-        amount: (acc?.[t.driverId]?.amount || 0) + Number(t.totalAmount || 0),
+        amount: (acc?.[t.id]?.amount || 0) + Number(t.totalAmount || 0),
         createdAt: t.createdAt,
       };
       return acc;
@@ -61,6 +61,12 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
 const getCashOut = async (transactions: Transaction[], isBank: boolean) => {
   const paymentTransactions = transactions.filter((t) => t.type === "PAYMENT");
   const expenseTransactions = transactions.filter((t) => t.type === "EXPENSE");
+  let depositTransactions: any = [];
+
+  if (!isBank) {
+    depositTransactions = transactions.filter((t) => t.type === "CASH_TO_BANK");
+  }
+
   const sellTxnByDriver = paymentTransactions.reduce(
     (acc, t: any) => {
       acc[t.companyId || t.customerId] = {
@@ -86,7 +92,20 @@ const getCashOut = async (transactions: Transaction[], isBank: boolean) => {
     },
     {} as Record<string, any>
   );
-  const res = [...Object.values(sellTxnByDriver), ...Object.values(expenseTxnByDriver)].sort((a, b) => b.createdAt - a.createdAt);
+
+  const depositTxnByDriver = depositTransactions.reduce(
+    (acc: any, t: any) => {
+      acc[t.id] = {
+        narration: `Deposited to ${t.bank?.name}`,
+        amount: (acc?.[t.id]?.amount || 0) + Number(t.totalAmount || 0),
+        createdAt: t.createdAt,
+      };
+      return acc;
+    },
+    {} as Record<string, any>
+  );
+
+  const res = [...Object.values(sellTxnByDriver), ...Object.values(expenseTxnByDriver), ...Object.values(depositTxnByDriver)].sort((a, b) => b.createdAt - a.createdAt);
   return res.map((r) => ({
     narration: r.narration,
     amount: r.amount,
