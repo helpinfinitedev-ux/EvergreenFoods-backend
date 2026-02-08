@@ -86,9 +86,9 @@ const getCashOut = async (transactions: Transaction[], isBank: boolean) => {
 
   const expenseTxnByDriver = expenseTransactions.reduce(
     (acc, t: any) => {
-      acc[t.driverId] = {
+      acc[t.id] = {
         narration: t.driver?.name + " " + t?.expense?.type + " Expense",
-        amount: (acc?.[t.driverId]?.amount || 0) + Number(t.totalAmount || 0),
+        amount: (acc?.[t.id]?.amount || 0) + Number(t.totalAmount || 0),
         createdAt: t.createdAt,
       };
       return acc;
