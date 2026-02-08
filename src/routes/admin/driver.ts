@@ -266,7 +266,7 @@ export const generateTodaysReport = async (req: Request, res: Response) => {
     .filter((t) => t.type === "BUY")
     .map((t) => {
       return {
-        companyName: t.company?.name || t.customer?.name || t?.details?.split(" ")?.[4] || t?.driver?.name || "",
+        companyName: t.company?.name || t.customer?.name || t?.details?.split(" ")?.[3] || t?.driver?.name || "",
         quantityKg: Number(t.amount || 0),
         rate: Number(t.rate || 0),
       };
