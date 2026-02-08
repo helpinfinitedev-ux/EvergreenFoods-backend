@@ -213,6 +213,9 @@ export const deleteExpense = async (req: Request, res: Response) => {
     const existingExpense = await prisma.expense.findUnique({
       where: { id },
     });
+    const existingTransaction = await prisma.transaction.findFirst({
+      where: { expenseId: id },
+    });
 
     if (!existingExpense) {
       return res.status(404).json({ error: "Expense not found" });
@@ -241,6 +244,11 @@ export const deleteExpense = async (req: Request, res: Response) => {
       await tx.expense.delete({
         where: { id },
       });
+      if (existingTransaction) {
+        await tx.transaction.delete({
+          where: { id: existingTransaction.id },
+        });
+      }
     });
 
     res.json({ success: true, message: "Expense deleted successfully" });
