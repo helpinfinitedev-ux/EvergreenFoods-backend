@@ -5,7 +5,7 @@ import { Transaction } from "@prisma/client";
 const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
   let sellTransactions = transactions.filter((t) => t.type === "SELL");
 
-  let advancePaymentTransactions = transactions.filter((t) => t.type === "RECEIVE_PAYMENT").filter((t) => t.companyId || t.customerId);
+  let advancePaymentTransactions = transactions.filter((t) => t.type === "RECEIVE_PAYMENT").filter((t) => t.companyId || t.customerId || t.driverId);
   let cashToBankTransactions = transactions.filter((t) => t.type === "CASH_TO_BANK");
 
   if (!isBank) {
