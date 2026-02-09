@@ -777,26 +777,6 @@ export const deleteTransaction = async (req: Request, res: Response) => {
         const transactionDay = new Date(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
         const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         const isToday = transactionDay.getTime() === todayDay.getTime();
-
-        const capital = await tx.totalCapital.findUnique({
-          where: { id: totalCashId },
-        });
-        if (!capital) {
-          throw new Error("TOTAL_CAPITAL_NOT_FOUND");
-        }
-
-        await tx.totalCapital.update({
-          where: { id: totalCashId },
-          data: {
-            totalCash: { decrement: cashAmount },
-            ...(isToday
-              ? {
-                  todayCash: { decrement: cashAmount },
-                  cashLastUpdatedAt: new Date(),
-                }
-              : {}),
-          },
-        });
       }
 
       await tx.transaction.delete({ where: { id } });
