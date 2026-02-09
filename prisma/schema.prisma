@@ -29,6 +29,7 @@ enum TransactionType {
   PAYMENT_TO_BANK
   PAYMENT_TO_EXPENSE
   PAYMENT_TO_OTHER
+  UPDATE_BANK
   CASH_TO_BANK
   BANK_TO_BANK
   EXPENSE
@@ -112,8 +113,8 @@ model Transaction {
   id         String          @id @default(uuid())
   type       TransactionType
   subType    String? // MORTALITY, WASTE, etc.
-  amount     Decimal // Weight (KG) or Liters
-  unit       String // KG, LITRE, COUNT
+  amount     Decimal? // Weight (KG) or Liters
+  unit       String? // KG, LITRE, COUNT
   rate       Decimal? // Price per unit
   totalAmount Decimal? // Total value
   companyName String? // Company name for buy/sell

@@ -16,11 +16,12 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
 
   let advancePaymentTransactions = transactions.filter((t) => t.type === "RECEIVE_PAYMENT").filter((t) => t.companyId || t.customerId || t.driverId);
   let cashToBankTransactions = transactions.filter((t) => t.type === "CASH_TO_BANK");
-
+  let updateBankTransactions = transactions.filter((t) => t.type === "UPDATE_BANK");
   if (!isBank) {
     sellTransactions = [];
     advancePaymentTransactions = advancePaymentTransactions.filter((t) => t.bankId === null);
     cashToBankTransactions = cashToBankTransactions.filter((t) => t.bankId === null);
+    updateBankTransactions = updateBankTransactions.filter((t) => t.bankId === null);
   } else {
     sellTransactions = sellTransactions.filter((t) => t.bankId !== null);
   }
@@ -62,7 +63,21 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
     {} as Record<string, any>
   );
 
-  const res = [...Object.values(sellTxnByDriver), ...Object.values(receivePaymentByCompanyAndCustomer), ...Object.values(cashToBankTxnByDriver)].sort((a, b) => b.createdAt - a.createdAt);
+  const updateBankTxn = updateBankTransactions.reduce(
+    (acc, t: any) => {
+      acc[t.id] = {
+        narration: `Updated bank balance to ${t.bank?.name}`,
+        amount: (acc?.[t.id]?.amount || 0) + Number(t.totalAmount || 0),
+        createdAt: t.createdAt,
+      };
+      return acc;
+    },
+    {} as Record<string, any>
+  );
+
+  const res = [...Object.values(sellTxnByDriver), ...Object.values(receivePaymentByCompanyAndCustomer), ...Object.values(cashToBankTxnByDriver), ...Object.values(updateBankTxn)].sort(
+    (a, b) => b.createdAt - a.createdAt
+  );
   return res.map((r) => ({
     narration: r.narration,
     amount: r.amount,

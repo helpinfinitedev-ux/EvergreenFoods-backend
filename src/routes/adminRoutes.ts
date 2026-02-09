@@ -876,6 +876,7 @@ export const updateBank = async (req: Request, res: Response) => {
     }
 
     const data: any = {};
+    let numericBalance = Number(balance);
     if (name !== undefined) {
       if (String(name).trim() === "") return res.status(400).json({ error: "name cannot be empty" });
       data.name = String(name).trim();
@@ -884,7 +885,7 @@ export const updateBank = async (req: Request, res: Response) => {
       data.label = String(label).trim();
     }
     if (balance !== undefined) {
-      const numericBalance = Number(balance);
+      numericBalance = Number(balance);
       if (Number.isNaN(numericBalance)) return res.status(400).json({ error: "balance must be a number" });
       data.balance = numericBalance;
     }
@@ -896,6 +897,18 @@ export const updateBank = async (req: Request, res: Response) => {
     const updated = await prisma.bank.update({
       where: { id },
       data,
+    });
+
+    await prisma.transaction.create({
+      data: {
+        amount: 0,
+        totalAmount: numericBalance - Number(bank.balance || 0),
+        driverId: (req as any).user.userId,
+        type: "UPDATE_BANK",
+        subType: "UPDATE",
+        bankId: id,
+        details: `Updated bank balance to ${numericBalance}`,
+      },
     });
 
     res.json({ success: true, bank: updated });
