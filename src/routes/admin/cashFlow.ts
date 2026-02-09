@@ -71,11 +71,12 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
 };
 
 const getCashOut = async (transactions: Transaction[], isBank: boolean) => {
-  const paymentTransactions = transactions.filter((t) => t.type === "PAYMENT");
+  let paymentTransactions = transactions.filter((t) => t.type === "PAYMENT");
   let expenseTransactions = transactions.filter((t) => t.type === "EXPENSE");
   let depositTransactions: any = [];
 
   if (!isBank) {
+    paymentTransactions = paymentTransactions.filter((t) => t.bankId === null);
     depositTransactions = transactions.filter((t) => t.type === "CASH_TO_BANK");
     expenseTransactions = expenseTransactions.filter((t) => t.bankId === null);
   }
