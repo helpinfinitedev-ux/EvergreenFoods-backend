@@ -89,6 +89,7 @@ export const createPayment = async (req: Request, res: Response) => {
           data: {
             amount: 0,
             totalAmount: numericAmount,
+            bankId: bankId || null,
             companyId: companyId || null,
             customerId: customerId || null,
             driverId: (req as AuthRequest).user?.userId || "",

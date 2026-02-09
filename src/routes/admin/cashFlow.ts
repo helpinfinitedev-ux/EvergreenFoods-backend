@@ -75,6 +75,8 @@ const getCashOut = async (transactions: Transaction[], isBank: boolean) => {
   let expenseTransactions = transactions.filter((t) => t.type === "EXPENSE");
   let depositTransactions: any = [];
 
+  console.log(paymentTransactions);
+
   if (!isBank) {
     paymentTransactions = paymentTransactions.filter((t) => t.bankId === null);
     depositTransactions = transactions.filter((t) => t.type === "CASH_TO_BANK");
