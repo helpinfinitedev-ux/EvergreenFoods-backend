@@ -66,7 +66,7 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
   const updateBankTxn = updateBankTransactions.reduce(
     (acc, t: any) => {
       acc[t.id] = {
-        narration: `Updated bank balance to ${t.bank?.name}`,
+        narration: `Updated bank balance of ${t.bank?.name}`,
         amount: (acc?.[t.id]?.amount || 0) + Number(t.totalAmount || 0),
         createdAt: t.createdAt,
       };
