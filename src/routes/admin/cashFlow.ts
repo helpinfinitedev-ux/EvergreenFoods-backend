@@ -132,6 +132,10 @@ export const cashFlow = async (req: Request, res: Response) => {
   endDate.setHours(23, 59, 59, 999);
   startDate.setHours(0, 0, 0, 0);
 
+  const previousDate = new Date(startDate);
+  previousDate.setDate(startDate.getDate() - 1);
+  previousDate.setHours(23, 59, 59, 999);
+
   const where: any = {};
   if (bankId && bankId !== "cash") {
     where.bankId = bankId;
@@ -155,6 +159,28 @@ export const cashFlow = async (req: Request, res: Response) => {
       expense: true,
     },
   });
+  const previousDateTransactions = await prisma.transaction.findMany({
+    where: {
+      createdAt: {
+        lte: previousDate,
+      },
+      ...where,
+    },
+    include: {
+      driver: true,
+      customer: true,
+      company: true,
+      vehicle: true,
+      bank: true,
+      payments: true,
+      expense: true,
+    },
+  });
+
+  const previousCashIn = await getCashIn(previousDateTransactions, bankId !== "cash");
+  const previousCashOut = await getCashOut(previousDateTransactions, bankId !== "cash");
+
+  const openingBalance = previousCashIn.reduce((s, r) => s + r.amount, 0) - previousCashOut.reduce((s, r) => s + r.amount, 0);
 
   const cashIn = await getCashIn(transactions, bankId !== "cash");
   const cashOut = await getCashOut(transactions, bankId !== "cash");
@@ -165,5 +191,5 @@ export const cashFlow = async (req: Request, res: Response) => {
   //     transactions,
   //   });
 
-  return res.json({ cashIn, cashOut, transactions });
+  return res.json({ cashIn, cashOut, transactions, openingBalance });
 };
