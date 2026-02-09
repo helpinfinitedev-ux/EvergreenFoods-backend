@@ -72,11 +72,12 @@ const getCashIn = async (transactions: Transaction[], isBank: boolean) => {
 
 const getCashOut = async (transactions: Transaction[], isBank: boolean) => {
   const paymentTransactions = transactions.filter((t) => t.type === "PAYMENT");
-  const expenseTransactions = transactions.filter((t) => t.type === "EXPENSE");
+  let expenseTransactions = transactions.filter((t) => t.type === "EXPENSE");
   let depositTransactions: any = [];
 
   if (!isBank) {
     depositTransactions = transactions.filter((t) => t.type === "CASH_TO_BANK");
+    expenseTransactions = expenseTransactions.filter((t) => t.bankId === null);
   }
 
   const sellTxnByDriver = paymentTransactions.reduce(

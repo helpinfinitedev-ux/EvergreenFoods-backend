@@ -683,6 +683,7 @@ export const updateTransaction = async (req: Request, res: Response) => {
     const { amount, rate, totalAmount, details, companyId, customerId, driverId, type, entityType } = req.body;
 
     const transaction = await prisma.transaction.findUnique({ where: { id } });
+
     if (!transaction) {
       return res.status(404).json({ error: "Transaction not found" });
     }
@@ -692,6 +693,8 @@ export const updateTransaction = async (req: Request, res: Response) => {
         const updated = await tx.transaction.update({
           where: { id },
           data: {
+            companyId,
+            customerId,
             amount: amount !== undefined ? Number(amount) : transaction.amount,
             rate: rate !== undefined ? Number(rate) : transaction.rate,
             totalAmount: totalAmount !== undefined ? Number(totalAmount) : transaction.totalAmount,
@@ -699,8 +702,6 @@ export const updateTransaction = async (req: Request, res: Response) => {
           },
           include: { driver: true, customer: true, vehicle: true },
         });
-
-        console.log(customerId);
 
         const entity = await getEntityDetails(tx, companyId || customerId || driverId || "", entityType);
         if (!entity) {
