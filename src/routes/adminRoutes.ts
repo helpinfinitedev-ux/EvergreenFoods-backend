@@ -887,7 +887,9 @@ export const updateBank = async (req: Request, res: Response) => {
     if (balance !== undefined) {
       numericBalance = Number(balance);
       if (Number.isNaN(numericBalance)) return res.status(400).json({ error: "balance must be a number" });
-      data.balance = numericBalance;
+      data.balance = {
+        increment: numericBalance,
+      };
     }
 
     if (Object.keys(data).length === 0) {
@@ -902,7 +904,7 @@ export const updateBank = async (req: Request, res: Response) => {
     await prisma.transaction.create({
       data: {
         amount: 0,
-        totalAmount: numericBalance - Number(bank.balance || 0),
+        totalAmount: numericBalance,
         driverId: (req as any).user.userId,
         type: "UPDATE_BANK",
         subType: "UPDATE",
