@@ -64,7 +64,7 @@ model User {
   otpExpiry    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  currentCapitalInHand Decimal @default(0)
+  cashInHand Decimal @default(0)
   currentStockInHand Decimal @default(0)
 
   // Relations

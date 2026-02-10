@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-async function main() {
+export async function main() {
   // Create Admin User
   const adminMobile = "7897404065";
   const adminPassword = "admin123";

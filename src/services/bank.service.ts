@@ -5,6 +5,9 @@ const updateBankBalance = async (tx: PrismaTransaction, bankId: string, amount: 
   if (!bank) {
     throw new Error("BANK_NOT_FOUND");
   }
+  if (operation === "decrement" && Number(bank.balance) < Number(amount || 0)) {
+    throw new Error("INSUFFICIENT_BALANCE");
+  }
   await tx.bank.update({
     where: { id: bankId },
     data: { balance: { [operation]: amount } },

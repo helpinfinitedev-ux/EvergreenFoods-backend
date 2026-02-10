@@ -10,7 +10,7 @@ export const prisma = basePrisma.$extends({
     transaction: {
       async create({ args, query }) {
         const result = await query(args);
-        console.log("Transaction created:", result.id);
+        console.log("Transaction created:", result);
 
         // Update driver's updatedAt after transaction create
         await basePrisma.user.update({
@@ -51,6 +51,7 @@ import notificationRoutes from "./routes/notificationRoutes";
 import expenseRoutes from "./routes/expenseRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
 import companyRoutes from "./routes/companyRoutes";
+import { main } from "./seed";
 
 app.use(cors());
 app.use(express.json());
