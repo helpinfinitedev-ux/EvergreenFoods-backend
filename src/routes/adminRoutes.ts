@@ -1019,6 +1019,7 @@ export const getTotalCapital = async (req: Request, res: Response) => {
 export const updateTotalCapital = async (req: Request, res: Response) => {
   try {
     const { amount } = req.body;
+    let numericAmount = Number(amount || 0);
     await prisma.$transaction(async (tx) => {
       let operation: "increment" | "decrement" = "increment";
       if (amount < 0) {
@@ -1026,6 +1027,23 @@ export const updateTotalCapital = async (req: Request, res: Response) => {
       }
 
       await updateTotalCashAndTodayCash(tx, Math.abs(amount), operation);
+      await tx.transaction.create({
+        data: {
+          amount: 0,
+          totalAmount: numericAmount,
+          driverId: (req as any).user.userId,
+          type: "UPDATE_CASH",
+          subType: operation === "increment" ? "ADD" : "SUBTRACT",
+          details: ` ${operation === "increment" ? "added" : "subtracted"} ${Math.abs(amount)} to cash`,
+          unit: "INR",
+          bankId: null,
+          customerId: null,
+          companyId: null,
+          vehicleId: null,
+          expenseId: null,
+          cashToBankId: null,
+        },
+      });
     });
     res.json({ success: true, message: "Total capital updated successfully" });
   } catch (error) {
