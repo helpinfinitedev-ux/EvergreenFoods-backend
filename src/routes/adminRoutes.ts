@@ -962,6 +962,30 @@ export const bankToBank = async (req: Request, res: Response) => {
         where: { id: toBankId },
         data: { balance: { increment: numericAmount } },
       });
+
+      await tx.transaction.create({
+        data: {
+          amount: 0,
+          totalAmount: numericAmount,
+          driverId: (req as any).user.userId,
+          type: "BANK_TO_BANK",
+          subType: "TRANSFER",
+          bankId: fromBankId,
+          details: `Transferred to ${toBank.name}`,
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          amount: 0,
+          totalAmount: numericAmount,
+          driverId: (req as any).user.userId,
+          type: "BANK_TO_BANK",
+          subType: "RECEIVE",
+          bankId: toBankId,
+          details: `Received from ${fromBank.name}`,
+        },
+      });
     });
 
     res.json({ success: true, message: "Transfer completed successfully" });
