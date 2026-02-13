@@ -65,6 +65,7 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   cashInHand Decimal @default(0)
+  upiInHand Decimal @default(0)
   currentStockInHand Decimal @default(0)
 
   // Relations
@@ -139,6 +140,7 @@ model Transaction {
   vehicleId    String?
   bank Bank? @relation(fields: [bankId], references: [id])
   bankId String?
+  upiPaymentApproved Boolean @default(false)
   
   // Palti Specific
   transferDriverName String?

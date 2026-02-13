@@ -450,3 +450,31 @@ export const getAllDriversActivitySummary = async (req: Request, res: Response) 
   console.log(driversActivity);
   return res.json({ driversActivity });
 };
+
+export const approveUpiPayment = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { approved } = req.body;
+  try {
+    const transaction = await prisma.transaction.findUnique({ where: { id }, include: { bank: true } });
+    if (!transaction || !transaction.id) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+    const paymentUpi = Number(transaction.paymentUpi || 0);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.transaction.update({ where: { id }, data: { upiPaymentApproved: approved } });
+      await tx.user.update({ where: { id: transaction.driverId }, data: { upiInHand: { decrement: Number(paymentUpi || 0) } } });
+
+      if (transaction.bankId) {
+        await tx.bank.update({ where: { id: transaction.bankId }, data: { balance: { increment: Number(paymentUpi || 0) } } });
+      }
+    });
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("Approve UPI payment error:", err);
+    return res.status(500).json({ error: "Failed to approve UPI payment" });
+  } finally {
+    return res.json({ success: true });
+  }
+};

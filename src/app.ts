@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Transaction } from "@prisma/client";
 
 const app = express();
 const basePrisma = new PrismaClient();
@@ -17,6 +17,8 @@ export const prisma = basePrisma.$extends({
           where: { id: result.driverId },
           data: { updatedAt: new Date() },
         });
+
+        await updateDriverWallet(basePrisma as PrismaClient, result as Transaction);
 
         return result;
       },
@@ -52,6 +54,7 @@ import expenseRoutes from "./routes/expenseRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
 import companyRoutes from "./routes/companyRoutes";
 import { main } from "./seed";
+import { updateDriverWallet } from "./workers/driver";
 
 app.use(cors());
 app.use(express.json());

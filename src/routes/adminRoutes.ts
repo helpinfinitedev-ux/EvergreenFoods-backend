@@ -4,7 +4,7 @@ import { prisma } from "../app";
 import { authenticate } from "../middleware/authMiddleware";
 import { updateTotalCashAndTodayCash } from "../services/cash.service";
 import { getAdminDashboard } from "./admin/dashboard";
-import { createDriver, deleteDriver, generateTodaysReport, getAllDriversActivitySummary, getDrivers, updateDriver, updateDriverStatus } from "./admin/driver";
+import { approveUpiPayment, createDriver, deleteDriver, generateTodaysReport, getAllDriversActivitySummary, getDrivers, updateDriver, updateDriverStatus } from "./admin/driver";
 import { getEntityDetails, updateEntityBalance } from "../services/transactions/receivePayments.service";
 import { updateBankBalance } from "../services/bank.service";
 import { Transaction } from "@prisma/client";
@@ -198,6 +198,10 @@ export const receiveCustomerPayment = async (req: Request, res: Response) => {
       const entity = await getEntityDetails(tx, driverId || customerId || companyId || "", type);
       if (!entity) {
         throw new Error("ENTITY_NOT_FOUND");
+      }
+
+      if (entity.cashInHand < numericAmount) {
+        return res.status(400).json({ error: "Insufficient cash" });
       }
 
       if (method === "BANK") {
@@ -1100,9 +1104,11 @@ router.get("/cash-to-bank", getCashToBank);
 router.post("/cash-to-bank", createCashToBank);
 router.put("/cash-to-bank/:id", updateCashToBank);
 router.delete("/cash-to-bank/:id", deleteCashToBank);
+//Transactions
 router.get("/transactions", getAdminTransactions);
 router.put("/transactions/:id", updateTransaction);
 router.delete("/transactions/:id", deleteTransaction);
+router.put("/transactions/:id/approve-upi-payment", approveUpiPayment);
 
 // Vehicle routes
 router.get("/vehicles", getVehicles);

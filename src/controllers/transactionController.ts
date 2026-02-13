@@ -132,9 +132,9 @@ export const addSellEntry = async (req: Request, res: Response) => {
         const change = bill - paid;
 
         await updateEntityBalance(tx, entity, change, entityType, entityType === "customer" ? "increment" : "decrement");
-        if (bankId) {
-          await updateBankBalance(tx, bankId, Number(paymentUpi || 0), "increment");
-        }
+        // if (bankId) {
+        //   await updateBankBalance(tx, bankId, Number(paymentUpi || 0), "increment");
+        // }
 
         return transaction;
       },
