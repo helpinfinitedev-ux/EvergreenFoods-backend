@@ -1,6 +1,16 @@
 import express from "express";
 import cors from "cors";
 import { PrismaClient, Transaction } from "@prisma/client";
+import authRoutes from "./routes/authRoutes";
+import transactionRoutes from "./routes/transactionRoutes";
+import customerRoutes from "./routes/customerRoutes";
+import adminRoutes from "./routes/adminRoutes";
+import notificationRoutes from "./routes/notificationRoutes";
+import expenseRoutes from "./routes/expenseRoutes";
+import paymentRoutes from "./routes/paymentRoutes";
+import companyRoutes from "./routes/companyRoutes";
+import { main } from "./seed";
+import { updateDriverWalletWhenTransactionIsCreated, updateDriverWalletWhenTransactionIsDeleted } from "./workers/driver";
 
 const app = express();
 const basePrisma = new PrismaClient();
@@ -18,7 +28,7 @@ export const prisma = basePrisma.$extends({
           data: { updatedAt: new Date() },
         });
 
-        await updateDriverWallet(basePrisma as PrismaClient, result as Transaction);
+        await updateDriverWalletWhenTransactionIsCreated(basePrisma as PrismaClient, result as Transaction);
 
         return result;
       },
@@ -39,22 +49,12 @@ export const prisma = basePrisma.$extends({
       async delete({ args, query }) {
         const result = await query(args);
         console.log("Transaction deleted:", result.id);
+        await updateDriverWalletWhenTransactionIsDeleted(basePrisma as PrismaClient, result as Transaction);
         return result;
       },
     },
   },
 });
-
-import authRoutes from "./routes/authRoutes";
-import transactionRoutes from "./routes/transactionRoutes";
-import customerRoutes from "./routes/customerRoutes";
-import adminRoutes from "./routes/adminRoutes";
-import notificationRoutes from "./routes/notificationRoutes";
-import expenseRoutes from "./routes/expenseRoutes";
-import paymentRoutes from "./routes/paymentRoutes";
-import companyRoutes from "./routes/companyRoutes";
-import { main } from "./seed";
-import { updateDriverWallet } from "./workers/driver";
 
 app.use(cors());
 app.use(express.json());

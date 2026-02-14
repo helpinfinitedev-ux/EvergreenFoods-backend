@@ -10,6 +10,8 @@ import { updateBankBalance } from "../services/bank.service";
 import { Transaction } from "@prisma/client";
 import { getPaymentsReceived } from "./admin/payments";
 import { cashFlow } from "./admin/cashFlow";
+import { getProfit } from "./admin/profit";
+import { deleteReceivedPayment } from "./admin/receivePayments";
 
 // --- Controllers ---
 
@@ -1135,5 +1137,11 @@ router.delete("/borrowed-money/:id", deleteBorrowedInfo);
 
 //cash flow
 router.get("/cash-flow", cashFlow);
+
+//profit
+router.get("/profit", getProfit);
+
+//receive payments
+router.delete("/receive-payments/:id", deleteReceivedPayment);
 
 export default router;

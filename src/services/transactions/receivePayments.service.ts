@@ -33,5 +33,6 @@ export const updateEntityBalance = async (tx: PrismaTransaction, entity: any, am
 
     await tx.company.update({ where: { id: entity.id }, data: { amountDue: newAmountDue } });
   }
+
   return;
 };
