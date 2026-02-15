@@ -577,12 +577,23 @@ export const getAdminTransactions = async (req: Request, res: Response) => {
       prisma.transaction.count({ where }),
       prisma.transaction.findMany({
         where,
-        include: { driver: true, customer: true, vehicle: true, company: true, bank: true },
+        include: {
+          driver: true,
+          customer: true,
+          vehicle: true,
+          company: true,
+          bank: {
+            select: {
+              name: true,
+            },
+          },
+        },
         orderBy: { createdAt: "desc" },
         skip,
         take: pageSize,
       }),
     ]);
+
     res.json({
       page: pageNum,
       pageSize,
@@ -595,7 +606,7 @@ export const getAdminTransactions = async (req: Request, res: Response) => {
 
   const logs = await prisma.transaction.findMany({
     where,
-    include: { driver: true, customer: true, vehicle: true },
+    include: { driver: true, customer: true, vehicle: true, bank: true },
     orderBy: { createdAt: "desc" },
     take: 100, // fallback for non-paginated calls
   });
