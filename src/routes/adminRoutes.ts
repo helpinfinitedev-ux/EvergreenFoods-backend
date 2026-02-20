@@ -758,7 +758,8 @@ export const deleteTransaction = async (req: Request, res: Response) => {
         throw new Error("UNSUPPORTED_TRANSACTION_TYPE");
       }
       if (transaction.type === "BUY") {
-        deleteBuyTransaction(transaction);
+        await deleteBuyTransaction(transaction);
+        return;
       }
       if (transaction.customerId) {
         const bill = Number(transaction.totalAmount || 0);

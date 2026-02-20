@@ -19,9 +19,11 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
     // const allTransactions = await prisma.transaction.findMany();
     // const totalCashIn = allTransactions.filter((t) => t.type === "SELL" || t.type === "ADVANCE_PAYMENT").reduce((sum, t) => sum + Number(t.paymentCash || 0) + Number(t.paymentUpi || 0), 0);
     // const totalCashOut = allTransactions.reduce((sum, t) => sum + Number(t.totalAmount || 0), 0);
-    const activeDrivers = await prisma.user.count({
-      where: { role: "DRIVER", status: "ACTIVE" },
+    const allDrivers = await prisma.user.findMany({
+      where: { role: "DRIVER" },
     });
+
+    const activeDrivers = allDrivers.filter((d) => d.status === "ACTIVE").length;
 
     // Calculate payment received today from SELL transactions
     const sellTransactions = transactions.filter((t) => t.type === "SELL");
@@ -52,6 +54,20 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
 
     // Calculate today's profit/loss (Sell - Buy)
     const todayProfit = todaySellTotalAmount - todayBuyTotalAmount;
+
+    const totalCashInHandOfDriver = allDrivers.reduce((acc, d) => {
+      acc = acc + Number(d.cashInHand || 0);
+      return acc;
+    }, 0);
+
+    const totalUpiInHandOfDriver = allDrivers.reduce((acc, d) => {
+      acc = acc + Number(d.upiInHand || 0);
+      return acc;
+    }, 0);
+
+    console.log("totalCashInHandOfDriver", totalCashInHandOfDriver);
+    console.log("totalUpiInHandOfDriver", totalUpiInHandOfDriver);
+
     // const totalCash
 
     const banks = await prisma.bank.findMany({
@@ -91,6 +107,8 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       totalBankBalance,
       totalInMarket: Number(totalInMarket._sum?.balance || 0),
       totalCompanyDue: Number(totalCompanyDue._sum?.amountDue || 0),
+      totalCashInHandOfDriver,
+      totalUpiInHandOfDriver,
     };
 
     res.json(stats);
