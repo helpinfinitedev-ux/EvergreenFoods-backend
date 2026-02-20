@@ -34,9 +34,30 @@ export const deleteSellTransaction = async (transaction: Transaction) => {
   return transaction;
 };
 
-export const deleteBuyTransaction =  async(transaction:Transaction) =>{
-  if(!transaction){
+export const deleteBuyTransaction = async (transaction: Transaction) => {
+  if (!transaction) {
     throw new Error("No transaction found");
   }
-}
-
+  await prisma.$transaction(async (tx) => {
+    if (transaction?.companyId) {
+      const entity = await tx.company.findUnique({ where: { id: transaction.companyId } });
+      if (!entity) {
+        throw new Error("Company not found");
+      }
+      await tx.company.update({ where: { id: transaction.companyId }, data: { amountDue: { decrement: Number(transaction.totalAmount || 0) } } });
+    } else if (transaction?.customerId) {
+      const entity = await tx.customer.findUnique({ where: { id: transaction.customerId } });
+      if (!entity) {
+        throw new Error("Customer not found");
+      }
+      await tx.customer.update({ where: { id: transaction.customerId }, data: { balance: { increment: Number(transaction.totalAmount || 0) } } });
+    } else if (transaction?.driverId) {
+      const entity = await tx.user.findUnique({ where: { id: transaction.driverId } });
+      if (!entity) {
+        throw new Error("Driver not found");
+      }
+    }
+    await tx.transaction.delete({ where: { id: transaction.id } });
+  });
+  return transaction;
+};

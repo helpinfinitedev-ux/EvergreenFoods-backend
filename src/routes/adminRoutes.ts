@@ -12,6 +12,7 @@ import { getPaymentsReceived } from "./admin/payments";
 import { cashFlow } from "./admin/cashFlow";
 import { getProfit } from "./admin/profit";
 import { deleteReceivedPayment } from "./admin/receivePayments";
+import { deleteBuyTransaction } from "../services/transactions/index.service";
 
 // --- Controllers ---
 
@@ -753,10 +754,12 @@ export const deleteTransaction = async (req: Request, res: Response) => {
       if (!transaction) {
         throw new Error("TRANSACTION_NOT_FOUND");
       }
-      if (transaction.type !== "SELL") {
+      if (transaction.type !== "SELL" && transaction.type !== "BUY") {
         throw new Error("UNSUPPORTED_TRANSACTION_TYPE");
       }
-
+      if (transaction.type === "BUY") {
+        deleteBuyTransaction(transaction);
+      }
       if (transaction.customerId) {
         const bill = Number(transaction.totalAmount || 0);
         const paid = Number(transaction.paymentCash || 0) + Number(transaction.paymentUpi || 0);
