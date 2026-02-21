@@ -478,3 +478,40 @@ export const approveUpiPayment = async (req: Request, res: Response) => {
     return res.json({ success: true });
   }
 };
+
+export const getUnapprovedUpiPayments = async (req: Request, res: Response) => {
+  const { start, end } = req.query;
+  let queryObj: any = {
+    where: {
+      upiPaymentApproved: false,
+      type: "SELL",
+      paymentUpi: {
+        gt: 0,
+      },
+    },
+  };
+  if (start) {
+    queryObj.where.createdAt = {
+      gte: new Date(start as string),
+    };
+  }
+  if (end) {
+    queryObj.where.createdAt = {
+      lte: new Date(end as string),
+    };
+  }
+  queryObj.include = {
+    driver: true,
+    customer: true,
+    company: true,
+    bank: true,
+  };
+  queryObj.orderBy = { createdAt: "desc" };
+  try {
+    const transactions = await prisma.transaction.findMany(queryObj);
+    return res.json(transactions);
+  } catch (error) {
+    console.error("Get unapproved UPI payments error:", error);
+    res.status(500).json({ error: "Failed to get unapproved UPI payments" });
+  }
+};

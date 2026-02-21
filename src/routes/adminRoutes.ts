@@ -4,7 +4,17 @@ import { prisma } from "../app";
 import { authenticate } from "../middleware/authMiddleware";
 import { updateTotalCashAndTodayCash } from "../services/cash.service";
 import { getAdminDashboard } from "./admin/dashboard";
-import { approveUpiPayment, createDriver, deleteDriver, generateTodaysReport, getAllDriversActivitySummary, getDrivers, updateDriver, updateDriverStatus } from "./admin/driver";
+import {
+  approveUpiPayment,
+  createDriver,
+  deleteDriver,
+  generateTodaysReport,
+  getAllDriversActivitySummary,
+  getDrivers,
+  getUnapprovedUpiPayments,
+  updateDriver,
+  updateDriverStatus,
+} from "./admin/driver";
 import { getEntityDetails, updateEntityBalance } from "../services/transactions/receivePayments.service";
 import { updateBankBalance } from "../services/bank.service";
 import { Transaction } from "@prisma/client";
@@ -1158,5 +1168,8 @@ router.get("/profit", getProfit);
 
 //receive payments
 router.delete("/receive-payments/:id", deleteReceivedPayment);
+
+//approve payments list
+router.get("/transactions/unapproved", getUnapprovedUpiPayments);
 
 export default router;
